@@ -33,7 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define MAX_LENGTH 10
+#define MAX_LENGTH 25
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -63,6 +63,8 @@ static void MX_USART2_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 uint8_t buf[MAX_LENGTH + 1];
+const uint8_t LCD_ADDRESS = 0x20 << 1;
+const uint8_t LCD_GPIO_ADDR = 0x09;
 
 /* USER CODE END 0 */
 
@@ -97,6 +99,29 @@ int main(void)
   MX_I2C1_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+  HAL_StatusTypeDef returnVal;
+
+  //Write to MC2008 I/O config
+  buf[0] = 0x00;
+  returnVal = HAL_I2C_Master_Transmit(&hi2c1, LCD_ADDRESS, buf, 1, HAL_MAX_DELAY);
+  if (returnVal != HAL_OK) {
+	  strncpy( (char*) buf, "Error Tx\r\n", MAX_LENGTH);
+  }
+  else {
+	  strncpy( (char*)buf, "GPIO ADDR Success\r\n", MAX_LENGTH);
+  }
+  HAL_UART_Transmit(&huart2, buf, strlen( (char*) buf), 1000);
+
+  //Set MC2008 I/O to output
+  buf[0] = 0x00
+  returnVal = HAL_I2C_Master_Transmit(&hi2c1, LCD_ADDRESS, buf, 1, HAL_MAX_DELAY);
+  if (returnVal != HAL_OK) {
+  	  strncpy( (char*) buf, "Error Tx\r\n", MAX_LENGTH);
+  }
+  else {
+  	  strncpy( (char*)buf, "GPIO ADDR Success\r\n", MAX_LENGTH);
+  }
+  HAL_UART_Transmit(&huart2, buf, strlen( (char*) buf), 1000);
 
   /* USER CODE END 2 */
 
@@ -104,9 +129,31 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  strncpy( (char*)buf, "Hello!\r\n", MAX_LENGTH);
+	  //Tell MC2008 we are writing to GPIO register
+	  buf[0] = LCD_GPIO_ADDR;
+	  returnVal = HAL_I2C_Master_Transmit(&hi2c1, LCD_ADDRESS, buf, 1, HAL_MAX_DELAY);
+	  if (returnVal != HAL_OK) {
+		  strncpy( (char*) buf, "Error Tx\r\n", MAX_LENGTH);
+	  }
+	  else {
+		  strncpy( (char*)buf, "GPIO ADDR Success\r\n", MAX_LENGTH);
+	  }
 	  HAL_UART_Transmit(&huart2, buf, strlen( (char*) buf), 1000);
-	  HAL_Delay(100);
+
+	  //Turn on the backlight
+	  buf[0] = 0x80;
+	  returnVal = HAL_I2C_Master_Transmit(&hi2c1, LCD_ADDRESS, buf, 1, HAL_MAX_DELAY);
+	  if (returnVal != HAL_OK) {
+		  strncpy( (char*) buf, "Error Tx\r\n", MAX_LENGTH);
+	  }
+	  else {
+		  strncpy( (char*)buf, "GPIO Write Success\r\n", MAX_LENGTH);
+	  }
+
+
+
+	  HAL_UART_Transmit(&huart2, buf, strlen( (char*) buf), 1000);
+	  HAL_Delay(1000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
