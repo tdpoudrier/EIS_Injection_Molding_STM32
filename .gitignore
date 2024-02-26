@@ -1,4 +1,7 @@
+#My additons
 .metadata
+*.launch
+*/Debug
 
 
 
