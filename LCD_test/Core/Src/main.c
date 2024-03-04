@@ -23,24 +23,18 @@
 /* USER CODE BEGIN Includes */
 #include <string.h>
 #include <stdio.h>
+#include "LCD_I2C.h"
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
-typedef struct struct_LCD_HandleTypeDef {
-	uint16_t address;
-	I2C_HandleTypeDef *hi2c;
-} LCD_HandleTypeDef;
-
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define LCD_ADDRESS 0x20
-#define MCP23008_GPIO 0x9
-#define MCP23008_IODIR 0x0
 #define MAX_LENGTH 25
 /* USER CODE END PD */
 
@@ -68,9 +62,7 @@ static void MX_I2C1_Init(void);
 static void MX_USART2_UART_Init(void);
 
 /* USER CODE BEGIN PFP */
-HAL_StatusTypeDef SendCommand (LCD_HandleTypeDef *hlcd, uint8_t mcp23008Address, uint8_t data);
 void printHalReturn(HAL_StatusTypeDef);
-void LCD_Init (LCD_HandleTypeDef *hlcd, uint8_t address);
 
 
 /* USER CODE END PFP */
@@ -97,7 +89,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-  LCD_Init(&hlcd, LCD_ADDRESS);
+
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -111,16 +103,12 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   MX_USART2_UART_Init();
+
   /* USER CODE BEGIN 2 */
   HAL_StatusTypeDef returnVal;
 
-//#define  I2C_AUTOEND_MODE               I2C_CR2_AUTOEND
-//#define  I2C_SOFTEND_MODE               (0x00000000U)
-
-  //Set GPIO direction to output
-  returnVal = SendCommand(&hlcd, MCP23008_IODIR, 0x00);
+  returnVal = LCD_Init(&hlcd, &hi2c1, LCD_ADDRESS);
   printHalReturn(returnVal);
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -129,12 +117,12 @@ int main(void)
   {
 	  /*** TURN ON BACKLIGHT ***/
 	  //Write
-	  returnVal = SendCommand(&hlcd, MCP23008_GPIO, 0x80);
+	  returnVal = LCD_EnableBacklight(&hlcd);
 	  printHalReturn(returnVal);
 
 	  HAL_Delay(1000);
 
-	  returnVal = SendCommand(&hlcd, MCP23008_GPIO, 0x00);
+	  returnVal = LCD_DisableBacklight(&hlcd);
 	  printHalReturn(returnVal);
 
 	  HAL_Delay(1000);
@@ -320,18 +308,6 @@ void printHalReturn (HAL_StatusTypeDef returnVal) {
   }
   HAL_UART_Transmit(&huart2, buf, strlen( (char*) buf), 1000);
 
-}
-
-void LCD_Init (LCD_HandleTypeDef *hlcd, uint8_t address) {
-	hlcd->hi2c = &hi2c1;
-	hlcd->address = LCD_ADDRESS << 1;
-
-}
-
-HAL_StatusTypeDef SendCommand (LCD_HandleTypeDef *hlcd, uint8_t mcp23008Address, uint8_t data) {
-	uint8_t dataBuffer[] = {mcp23008Address, data};
-	HAL_StatusTypeDef returnVal = HAL_I2C_Master_Transmit(hlcd->hi2c, hlcd->address, dataBuffer, sizeof(dataBuffer), 1000);
-	return returnVal;
 }
 /* USER CODE END 4 */
 
