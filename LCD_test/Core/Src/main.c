@@ -115,17 +115,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  /*** TURN ON BACKLIGHT ***/
-	  //Write
-	  returnVal = LCD_EnableBacklight(&hlcd);
-	  printHalReturn(returnVal);
 
-	  HAL_Delay(1000);
-
-	  returnVal = LCD_DisableBacklight(&hlcd);
-	  printHalReturn(returnVal);
-
-	  HAL_Delay(1000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
