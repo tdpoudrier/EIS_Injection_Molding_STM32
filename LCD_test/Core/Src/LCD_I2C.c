@@ -182,7 +182,3 @@ HAL_StatusTypeDef MCP23008_SendDataI2C (LCD_HandleTypeDef *hlcd, uint8_t mcp2300
 	uint8_t dataBuffer[] = {mcp23008Address, data};
 	return HAL_I2C_Master_Transmit(hlcd->hi2c, hlcd->address, dataBuffer, sizeof(dataBuffer), 1000);
 }
-
-
-
-
