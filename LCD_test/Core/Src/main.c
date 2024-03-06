@@ -111,16 +111,13 @@ int main(void)
   printHalReturn(returnVal);
   /* USER CODE END 2 */
 
-  LCD_SendCommand(&hlcd, 'A', false);
-  LCD_SendCommand(&hlcd, 'b', false);
-
   uint8_t letter = 'A';
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  LCD_SendCommand(&hlcd, letter, false);
+	  LCD_PrintChar(&hlcd, letter);
 	  letter++;
 	  if(letter > 'z') {
 		  letter = 'A';
