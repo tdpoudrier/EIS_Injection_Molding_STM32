@@ -22,47 +22,27 @@ HAL_StatusTypeDef LCD_Init (LCD_HandleTypeDef *hlcd, I2C_HandleTypeDef *hi2c, ui
 	if (status != HAL_OK) {return status;}
 
 	//Wake up
-	LCD_SendCommand(hlcd, 0x18);
+	LCD_Write(hlcd, 0x18);
 	HAL_Delay(50);
-	LCD_SendCommand(hlcd, 0x18);
+	LCD_Write(hlcd, 0x18);
 	HAL_Delay(50);
-	LCD_SendCommand(hlcd, 0x18);
+	LCD_Write(hlcd, 0x18);
 	HAL_Delay(50);
 
-	//Set LCD to 4 bits
-	LCD_SendCommand(hlcd, 0x10);
-
-	//Set LCD to 16x2
-	LCD_SendCommand(hlcd, 0x10);
-	LCD_SendCommand(hlcd, 0x60);
+	//function set 4-bit, 2-line, 5x10 dots
+	LCD_SendCommand(hlcd, 0x2B, true);
 
 	//Display off
-	LCD_SendCommand(hlcd, 0x00);
-	LCD_SendCommand(hlcd, 0x40);
+	LCD_SendCommand(hlcd, 0x08, true);
 
-	//Display clear
-	LCD_SendCommand(hlcd, 0x00);
-	LCD_SendCommand(hlcd, 0x08);
+	//display clear
+	LCD_SendCommand(hlcd, 0x01, true);
 
-	//Entry mode set
-	LCD_SendCommand(hlcd, 0x00);
-	LCD_SendCommand(hlcd, 0x38);
+	//entry mode
+	LCD_SendCommand(hlcd, 0x07, true);
 
-	//Turn on display, enable blinking cursor
-	LCD_SendCommand(hlcd, 0x00);
-	LCD_SendCommand(hlcd, 0x78);
-
-	//Return home
-	LCD_SendCommand(hlcd, 0x00);
-	LCD_SendCommand(hlcd, 0x10);
-
-	//Write A
-	LCD_SendCommand(hlcd, 0x20 | 0x02);
-	LCD_SendCommand(hlcd, 0x08 | 0x02);
-
-	//Write B
-	LCD_SendCommand(hlcd, 0x20 | 0x02);
-	LCD_SendCommand(hlcd, 0x10 | 0x02);
+	//Turn display on and blink cursor
+	LCD_SendCommand(hlcd, 0x0f, true);
 
 	return status;
 }
@@ -77,19 +57,41 @@ HAL_StatusTypeDef LCD_DisableBacklight (LCD_HandleTypeDef *hlcd) {
 	return SendCommand (hlcd, MCP23008_GPIO, 0x00);
 }
 
-HAL_StatusTypeDef LCD_SendCommand (LCD_HandleTypeDef *hlcd, uint8_t data) {
+
+//Convert 8 bit command into 4 bit command
+HAL_StatusTypeDef LCD_SendCommand (LCD_HandleTypeDef *hlcd, uint8_t data, uint8_t isInstruction) {
+
 	HAL_StatusTypeDef status = HAL_OK;
 
-	//set enable high
-	status = SendCommand(hlcd, MCP23008_GPIO, LCD_ENABLE);
-	if (status != HAL_OK) {return status;}
+	//Seperate into Nibbles
+	uint8_t upperNibble = (data & 0xF0) >> 4;
+	uint8_t lowNibble = data & 0x0F;
+
+	//Calculate rs bit
+	uint8_t rsBit = (!isInstruction & 0x01) << 1;
+
+	//Send data to MCP23008 GPIO
+	status = LCD_Write(hlcd, upperNibble >> 1 | rsBit);
+	status = LCD_Write(hlcd, lowNibble << 3 | rsBit);
+
+	return status;
+}
+
+HAL_StatusTypeDef LCD_Write (LCD_HandleTypeDef *hlcd, uint8_t data) {
+	HAL_StatusTypeDef status = HAL_OK;
 
 	//Send data
+	status = SendCommand(hlcd, MCP23008_GPIO, data | LCD_BACKLIGHT);
+	if (status != HAL_OK) {return status;}
+
+	HAL_Delay(10);
+
+	//Sent enable high
 	status = SendCommand(hlcd, MCP23008_GPIO, data | LCD_ENABLE | LCD_BACKLIGHT);
 	if (status != HAL_OK) {return status;}
 
 	//set enable low
-	status = SendCommand(hlcd, MCP23008_GPIO, 0x00 | LCD_BACKLIGHT);
+	status = SendCommand(hlcd, MCP23008_GPIO, data | LCD_BACKLIGHT);
 	if (status != HAL_OK) {return status;}
 
 	HAL_Delay(10);
