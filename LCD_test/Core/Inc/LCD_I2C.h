@@ -13,6 +13,8 @@
 
 #define MCP23008_GPIO 0x9
 #define MCP23008_IODIR 0x0
+#define MCP23008_CONFIG 0x05
+#define MCP23008_CONFIG_SEQOP 0x2
 
 #define LCD_BACKLIGHT 0x80
 #define LCD_ENABLE 0x04
@@ -34,6 +36,8 @@ HAL_StatusTypeDef LCD_PrintChar (LCD_HandleTypeDef *hlcd, uint8_t data);
 HAL_StatusTypeDef LCD_SendData (LCD_HandleTypeDef *hlcd, uint8_t data);
 
 HAL_StatusTypeDef MCP23008_SendDataI2C (LCD_HandleTypeDef *hlcd, uint8_t mcp23008Address, uint8_t data);
+
+HAL_StatusTypeDef MCP23008_SendStringI2C (LCD_HandleTypeDef *hlcd, uint8_t mcp23008Address, unsigned char* data);
 
 
 #endif /* INC_LCD_I2C_H_ */

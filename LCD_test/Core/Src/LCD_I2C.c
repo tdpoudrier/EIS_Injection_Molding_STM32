@@ -24,6 +24,9 @@ HAL_StatusTypeDef LCD_Init (LCD_HandleTypeDef *hlcd, I2C_HandleTypeDef *hi2c, ui
 	//Set MCP23008 GPIO Register direction to output
 	status += MCP23008_SendDataI2C(hlcd, MCP23008_IODIR, 0x00);
 
+	//Set MCP23008 CONFIG Register to not auto-increment addresses
+	status += MCP23008_SendDataI2C(hlcd, MCP23008_CONFIG, MCP23008_CONFIG_SEQOP);
+
 	//Wake up, Enter initalization
 	status += LCD_SendData(hlcd, 0x18);
 	HAL_Delay(50);
@@ -55,9 +58,23 @@ HAL_StatusTypeDef LCD_Init (LCD_HandleTypeDef *hlcd, I2C_HandleTypeDef *hi2c, ui
 
 HAL_StatusTypeDef LCD_Print (LCD_HandleTypeDef *hlcd, char *string) {
 	HAL_StatusTypeDef status = HAL_OK;
-	for (int i = 0; i < strlen(string); i++) {
-		status += LCD_PrintChar(hlcd, string[i]);
+
+	unsigned char dataBuffer[(80 * 2) + 1 + 1] = {0};
+
+	uint8_t length = strlen(string);
+	if (length > 80) {
+		length = 80;
+		string[length] = '\n';
 	}
+
+	//Convert ASCII value to two 4-bit nibbles for LCD Communication
+	for (int i = 0; i < strlen(string); i += 2) {
+		dataBuffer[i] = (string[i] & 0xF0) >> 1;
+		dataBuffer[i + 1] = (string[i] & 0x0F) << 3;
+	}
+
+	MCP23008_SendStringI2C(hlcd, MCP23008_GPIO, dataBuffer);
+
 	return status;
 }
 
@@ -145,6 +162,22 @@ HAL_StatusTypeDef MCP23008_SendDataI2C (LCD_HandleTypeDef *hlcd, uint8_t mcp2300
 	uint8_t dataBuffer[] = {mcp23008Address, data};
 	return HAL_I2C_Master_Transmit(hlcd->hi2c, hlcd->address, dataBuffer, sizeof(dataBuffer), 1000);
 }
+
+HAL_StatusTypeDef MCP23008_SendStringI2C (LCD_HandleTypeDef *hlcd, uint8_t mcp23008Address, unsigned char* data) {
+	//LCD can display 80 characters, each character requires two 4-bit commands, plus 1 for null character, and plus 1 for mcp23008 register address
+	unsigned char dataBuffer[(80 * 2) + 1 + 1] = {0};
+	strncpy((char*) dataBuffer, (char*) data, 80);
+
+
+	for (int i = 0; i < strlen((char*)dataBuffer); i++) {
+		dataBuffer[i] = dataBuffer[i + 1];
+	}
+	dataBuffer[0] = MCP23008_GPIO;
+
+	return HAL_I2C_Master_Transmit(hlcd->hi2c, hlcd->address, dataBuffer, sizeof(dataBuffer), 1000);
+}
+
+
 
 
 

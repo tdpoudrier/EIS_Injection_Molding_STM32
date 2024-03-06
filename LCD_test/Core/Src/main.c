@@ -114,10 +114,8 @@ int main(void)
   while (1)
   {
 	  returnVal = LCD_Print(&hlcd, "Hello, World!");
-	  printHalReturn(returnVal);
-
-	  HAL_Delay(1000);
-
+	    printHalReturn(returnVal);
+	    HAL_Delay(1000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
