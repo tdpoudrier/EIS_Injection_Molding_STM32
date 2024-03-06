@@ -29,7 +29,10 @@ HAL_StatusTypeDef LCD_Init (LCD_HandleTypeDef *hlcd, I2C_HandleTypeDef *hi2c, ui
 	LCD_Write(hlcd, 0x18);
 	HAL_Delay(50);
 
-	//function set 4-bit, 2-line, 5x10 dots
+	//Set LCD to 4 bits
+	LCD_Write(hlcd, 0x10);
+
+	//function set 2-line, 5x10 dots
 	LCD_SendCommand(hlcd, 0x2B, true);
 
 	//Display off
@@ -39,10 +42,13 @@ HAL_StatusTypeDef LCD_Init (LCD_HandleTypeDef *hlcd, I2C_HandleTypeDef *hi2c, ui
 	LCD_SendCommand(hlcd, 0x01, true);
 
 	//entry mode
-	LCD_SendCommand(hlcd, 0x07, true);
+	LCD_SendCommand(hlcd, 0x06, true);
 
 	//Turn display on and blink cursor
 	LCD_SendCommand(hlcd, 0x0f, true);
+
+//	//Set cursor to move and shift right
+//	LCD_SendCommand(hlcd, 0x1B, true);
 
 	return status;
 }
@@ -71,8 +77,10 @@ HAL_StatusTypeDef LCD_SendCommand (LCD_HandleTypeDef *hlcd, uint8_t data, uint8_
 	uint8_t rsBit = (!isInstruction & 0x01) << 1;
 
 	//Send data to MCP23008 GPIO
-	status = LCD_Write(hlcd, upperNibble >> 1 | rsBit);
-	status = LCD_Write(hlcd, lowNibble << 3 | rsBit);
+	uint8_t data1 = (upperNibble << 3) | rsBit;
+	uint8_t data2 = (lowNibble << 3) | rsBit;
+	status = LCD_Write(hlcd, data1);
+	status = LCD_Write(hlcd, data2);
 
 	return status;
 }
