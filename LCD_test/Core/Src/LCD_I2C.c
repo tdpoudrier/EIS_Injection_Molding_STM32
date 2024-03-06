@@ -24,6 +24,9 @@ HAL_StatusTypeDef LCD_Init (LCD_HandleTypeDef *hlcd, I2C_HandleTypeDef *hi2c, ui
 	//Set MCP23008 GPIO Register direction to output
 	status += MCP23008_SendDataI2C(hlcd, MCP23008_IODIR, 0x00);
 
+	//Wait for VDD
+	HAL_Delay(50);
+
 	//Wake up, Enter initalization
 	status += LCD_SendData(hlcd, 0x18);
 	HAL_Delay(50);
@@ -51,6 +54,40 @@ HAL_StatusTypeDef LCD_Init (LCD_HandleTypeDef *hlcd, I2C_HandleTypeDef *hi2c, ui
 	status += LCD_WriteCommand(hlcd, 0x0f);
 
 	return status;
+}
+
+/**
+ * Sets the cursor of the LCD at the given column and row
+ * @param hlcd Pointer to LCD handle
+ * @param col Column position of cursor, ranges from 0-19
+ * @param row Row position of cursor, ranges from 0-3
+ * @return HAL_OK on success, otherwise HAL_ERROR
+ */
+HAL_StatusTypeDef LCD_SetCursor (LCD_HandleTypeDef *hlcd, uint8_t col, uint8_t row) {
+	if (col > 19) {
+		return HAL_ERROR;
+	}
+
+	uint8_t cursorPos = 0;
+
+	switch (row) {
+	case 0:
+		cursorPos = col + LCD_ROW_0;
+		break;
+	case 1:
+		cursorPos = col + LCD_ROW_1;
+		break;
+	case 2:
+		cursorPos = col + LCD_ROW_2;
+		break;
+	case 3:
+		cursorPos = col + LCD_ROW_3;
+		break;
+	default:
+		return HAL_ERROR;
+	}
+
+	return LCD_WriteCommand(hlcd, LCD_SET_DDRAM | cursorPos);
 }
 
 HAL_StatusTypeDef LCD_Print (LCD_HandleTypeDef *hlcd, char *string) {

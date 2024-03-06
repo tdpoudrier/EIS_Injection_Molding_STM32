@@ -107,17 +107,27 @@ int main(void)
 
   returnVal = LCD_Init(&hlcd, &hi2c1, LCD_ADDRESS);
   printHalReturn(returnVal);
+
+  uint8_t currentCol = 0;
+  uint8_t currentRow = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  returnVal = LCD_Print(&hlcd, "Hello, World!");
-	  printHalReturn(returnVal);
+	  LCD_SetCursor(&hlcd, currentCol, currentRow);
+	  currentCol++;
+
+	  if(currentCol > 19) {
+		  currentCol = 0;
+		  currentRow++;
+	  }
+	  if(currentRow > 3) {
+		  currentRow = 0;
+	  }
 
 	  HAL_Delay(1000);
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

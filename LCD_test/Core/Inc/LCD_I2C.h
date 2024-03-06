@@ -17,6 +17,12 @@
 #define LCD_BACKLIGHT 0x80
 #define LCD_ENABLE 0x04
 #define LCD_WRITE_DATA 0x02
+#define LCD_SET_DDRAM 0x80
+
+#define LCD_ROW_0 0x00
+#define LCD_ROW_1 0x40
+#define LCD_ROW_2 0x14
+#define LCD_ROW_3 0x54
 
 typedef struct __LCD_HandleTypeDef {
 	uint16_t address;
@@ -24,6 +30,8 @@ typedef struct __LCD_HandleTypeDef {
 } LCD_HandleTypeDef;
 
 HAL_StatusTypeDef LCD_Init (LCD_HandleTypeDef *hlcd, I2C_HandleTypeDef *hi2c, uint8_t address);
+
+HAL_StatusTypeDef LCD_SetCursor (LCD_HandleTypeDef *hlcd, uint8_t col, uint8_t row);
 
 HAL_StatusTypeDef LCD_Print (LCD_HandleTypeDef *hlcd, char *string);
 
