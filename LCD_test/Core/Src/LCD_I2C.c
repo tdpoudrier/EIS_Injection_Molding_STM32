@@ -53,6 +53,14 @@ HAL_StatusTypeDef LCD_Init (LCD_HandleTypeDef *hlcd, I2C_HandleTypeDef *hi2c, ui
 	return status;
 }
 
+HAL_StatusTypeDef LCD_Print (LCD_HandleTypeDef *hlcd, char *string) {
+	HAL_StatusTypeDef status = HAL_OK;
+	for (int i = 0; i < strlen(string); i++) {
+		status += LCD_PrintChar(hlcd, string[i]);
+	}
+	return status;
+}
+
 
 /**
  * Convert 8 bit command into two 4-bit command and write to LCD
@@ -109,17 +117,19 @@ HAL_StatusTypeDef LCD_SendData (LCD_HandleTypeDef *hlcd, uint8_t data) {
 	status = MCP23008_SendDataI2C(hlcd, MCP23008_GPIO, data | LCD_BACKLIGHT);
 	if (status != HAL_OK) {return status;}
 
-	HAL_Delay(10);
+	HAL_Delay(1);
 
 	//Sent enable high
 	status = MCP23008_SendDataI2C(hlcd, MCP23008_GPIO, data | LCD_ENABLE | LCD_BACKLIGHT);
 	if (status != HAL_OK) {return status;}
 
+	HAL_Delay(1);
+
 	//set enable low
 	status = MCP23008_SendDataI2C(hlcd, MCP23008_GPIO, data | LCD_BACKLIGHT);
 	if (status != HAL_OK) {return status;}
 
-	HAL_Delay(10);
+	HAL_Delay(1);
 
 	return status;
 }
