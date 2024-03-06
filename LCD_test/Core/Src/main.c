@@ -111,10 +111,18 @@ int main(void)
   printHalReturn(returnVal);
   /* USER CODE END 2 */
 
+  uint8_t letter = 'A';
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  LCD_PrintChar(&hlcd, letter);
+	  letter++;
+	  if(letter > 'z') {
+		  letter = 'A';
+	  }
+	  HAL_Delay(1000);
 
     /* USER CODE END WHILE */
 
