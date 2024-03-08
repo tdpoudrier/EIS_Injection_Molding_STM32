@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include "MAX31855.h"
 
 /* USER CODE END Includes */
 
@@ -46,6 +47,7 @@ SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+MAX31855_HandleTypeDef max31855;
 
 /* USER CODE END PV */
 
@@ -72,7 +74,6 @@ int main(void)
   /* USER CODE BEGIN 1 */
 	char uart_buf[50];
 	int uart_buf_len;
-	uint8_t spi_buf[4] = {0};
 
   /* USER CODE END 1 */
 
@@ -98,16 +99,18 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
-  //CS pin normally HIGH
-  HAL_GPIO_WritePin(GPIOB, SPI1_CS_Pin, GPIO_PIN_SET);
+  /*
+   * MISO is PB4/D5
+   * CLK is PB3/D3
+   * CS is PB5/D6
+   */
+  MAX_Init(&max31855, &hspi1, GPIO_PIN_5, GPIOB);
 
   //Say something
   uart_buf_len = sprintf(uart_buf, "SPI Test\r\n");
   HAL_UART_Transmit(&huart2, (uint8_t *) uart_buf, uart_buf_len, 100);
 
-  unsigned int internalTemp;
-  uart_buf_len = sprintf(uart_buf, "Size of internalTemp: %d\r\n",sizeof(internalTemp));
-  HAL_UART_Transmit(&huart2, (uint8_t *) uart_buf, uart_buf_len, 100);
+  uint32_t celcius = 0;
 
   /* USER CODE END 2 */
 
@@ -115,25 +118,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  //Read 32 bits from MAX3166
-	  HAL_GPIO_WritePin(GPIOB, SPI1_CS_Pin, GPIO_PIN_RESET);
-	  HAL_SPI_Receive(&hspi1, (uint8_t *) spi_buf, 4, 100);
-	  HAL_GPIO_WritePin(GPIOB, SPI1_CS_Pin, GPIO_PIN_SET);
+	  celcius = MAX_GetCelcius(&max31855);
 
-	  //Assemble data into one int variable
-	  internalTemp = 0x00000000;
-	  for(int i = 0, j = 3; i < 4; i++) {
-		 internalTemp = internalTemp | (spi_buf[j] << (i * 8));
-		 j--;
-	  }
-
-	  float celcius = (internalTemp >> 18) * 0.25;
-
-	  //Print out data
-	  uart_buf_len = sprintf(uart_buf, "Max3166 data: 0x%08x\r\n",internalTemp);
-	  HAL_UART_Transmit(&huart2, (uint8_t *) uart_buf, uart_buf_len, 100);
-
-	  int tempCel = celcius * 100;
+	  int tempCel = celcius;
 	  uart_buf_len = sprintf(uart_buf, "Temp in C: %d.%d\r\n", tempCel/100, tempCel % 100);
 	  HAL_UART_Transmit(&huart2, (uint8_t *) uart_buf, uart_buf_len, 100);
 
