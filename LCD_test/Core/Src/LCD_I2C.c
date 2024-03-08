@@ -56,6 +56,10 @@ HAL_StatusTypeDef LCD_Init (LCD_HandleTypeDef *hlcd, I2C_HandleTypeDef *hi2c, ui
 	return status;
 }
 
+HAL_StatusTypeDef LCD_Clear (LCD_HandleTypeDef *hlcd) {
+	return LCD_WriteCommand(hlcd, 0x01);
+}
+
 /**
  * Sets the cursor of the LCD at the given column and row
  * @param hlcd Pointer to LCD handle

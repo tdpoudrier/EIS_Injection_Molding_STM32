@@ -31,6 +31,8 @@ typedef struct __LCD_HandleTypeDef {
 
 HAL_StatusTypeDef LCD_Init (LCD_HandleTypeDef *hlcd, I2C_HandleTypeDef *hi2c, uint8_t address);
 
+HAL_StatusTypeDef LCD_Clear (LCD_HandleTypeDef *hlcd);
+
 HAL_StatusTypeDef LCD_SetCursor (LCD_HandleTypeDef *hlcd, uint8_t col, uint8_t row);
 
 HAL_StatusTypeDef LCD_Print (LCD_HandleTypeDef *hlcd, char *string);

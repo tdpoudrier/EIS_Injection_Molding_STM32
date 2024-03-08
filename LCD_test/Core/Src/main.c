@@ -88,6 +88,9 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+  uint8_t currentRow = 0;
+  char buffer[21] = {0};
+  uint8_t count = 0;
 
   /* USER CODE END Init */
 
@@ -107,24 +110,22 @@ int main(void)
 
   returnVal = LCD_Init(&hlcd, &hi2c1, LCD_ADDRESS);
   printHalReturn(returnVal);
-
-  uint8_t currentCol = 0;
-  uint8_t currentRow = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  LCD_SetCursor(&hlcd, currentCol, currentRow);
-	  currentCol++;
+	  snprintf(buffer, 21, "Hello World count:%d", count);
+	  LCD_SetCursor(&hlcd, 0, currentRow);
+	  LCD_Print(&hlcd, buffer);
+	  currentRow++;
+	  count++;
 
-	  if(currentCol > 19) {
-		  currentCol = 0;
-		  currentRow++;
-	  }
 	  if(currentRow > 3) {
 		  currentRow = 0;
+		  HAL_Delay(500);
+		  LCD_Clear(&hlcd);
 	  }
 
 	  HAL_Delay(1000);
