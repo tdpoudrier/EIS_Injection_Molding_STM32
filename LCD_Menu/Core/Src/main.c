@@ -69,7 +69,54 @@ static void MX_USART2_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 LCD_MENU_Item menuItems[MAX_MENU_ITEMS];
-int numItems = 0;
+
+char * hometxt[4] =
+{
+		"Set temp",
+		"Current temp 1",
+		"Current temp 2",
+		"Process Name"
+};
+
+char * profiles[4] =
+{
+		"PEEK",
+		"PPE",
+		"milk jug",
+		""
+};
+
+char * temperatures[4] =
+{
+		"group 1: 200",
+		"group 2: 220",
+		"",
+		""
+};
+
+char * speed[4] =
+{
+		"Kp: 1",
+		"Ki: 0.5",
+		"",
+		""
+};
+
+char * testStringArray1[4] =
+{
+		"sadf",
+		"gfjh",
+		"kfghjk",
+		"hjh"
+};
+
+char * testStringArray2[4] =
+{
+		"asdf",
+		"Poudrier",
+		"Tevin",
+		""
+};
 
 /* USER CODE END 0 */
 
@@ -107,23 +154,21 @@ int main(void)
 
   LCD_Init(&hlcd, &hi2c1, LCD_ADDRESS);
 
-  LCD_MENU_ItemInit(&menuItems[0], "item1");
-  LCD_MENU_ItemInit(&menuItems[1], "item2");
-  LCD_MENU_ItemInit(&menuItems[2], "item3");
-  LCD_MENU_ItemInit(&menuItems[3], "item4");
-  LCD_MENU_ItemInit(&menuItems[4], "item5");
-  LCD_MENU_ItemInit(&menuItems[5], "item6");
-  numItems = 6;
 
-  LCD_MENU_ListInit(&hlcd, &menuList, menuItems, numItems);
+  LCD_MENU_ListInit(&hlcd, &menuList);
 
-  int count = 0;
+  LCD_MENU_AddItem(&menuList, &menuItems[0], "Home", hometxt);
+  LCD_MENU_AddItem(&menuList, &menuItems[1], "Profiles", profiles);
+  LCD_MENU_AddItem(&menuList, &menuItems[2], "Temperatures", temperatures);
+  LCD_MENU_AddItem(&menuList, &menuItems[3], "Speed", speed);
+  LCD_MENU_AddItem(&menuList, &menuItems[4], "test1234", testStringArray1);
+  LCD_MENU_AddItem(&menuList, &menuItems[5], "test0312", testStringArray2);
 
 
 
 
 
-
+  int selectedItem = 0;
 
 
 
@@ -133,12 +178,22 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	  LCD_MENU_PrintList(&menuList, count);
-	  count++;
-	  if(count > numItems) {
-		  count = 0;
+	  LCD_MENU_PrintList(&menuList, selectedItem++);
+
+	  HAL_Delay(2000);
+
+	  LCD_MENU_MoveCursor(&menuList, 1);
+
+	  HAL_Delay(2000);
+
+	  LCD_MENU_PrintItem(&menuList, 1);
+
+	  HAL_Delay(2000);
+
+	  selectedItem++;
+	  if (selectedItem > menuList.numItems) {
+		  selectedItem = 0;
 	  }
-	  HAL_Delay(1000);
 
     /* USER CODE BEGIN 3 */
   }
