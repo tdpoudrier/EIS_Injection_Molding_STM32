@@ -51,8 +51,6 @@ UART_HandleTypeDef huart2;
 
 LCD_HandleTypeDef hlcd;
 
-LCD_MENU_List menuList;
-
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -68,7 +66,8 @@ static void MX_USART2_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-LCD_MENU_Item menuItems[MAX_MENU_ITEMS];
+LCD_MENU_List menuLists[3];
+LCD_MENU_Item menuItems[10];
 
 char * hometxt[4] =
 {
@@ -118,6 +117,14 @@ char * testStringArray2[4] =
 		""
 };
 
+char * credits[4] =
+{
+		"Tevin Poudrier",
+		"Jonah Shadley",
+		"Colson Miller",
+		"Josiah Mart"
+};
+
 /* USER CODE END 0 */
 
 /**
@@ -155,21 +162,34 @@ int main(void)
   LCD_Init(&hlcd, &hi2c1, LCD_ADDRESS);
 
 
-  LCD_MENU_ListInit(&hlcd, &menuList);
+  LCD_MENU_ListInit(&hlcd, &menuLists[0]);
+  LCD_MENU_ListInit(&hlcd, &menuLists[1]);
+  LCD_MENU_ListInit(&hlcd, &menuLists[2]);
 
-  LCD_MENU_AddItem(&menuList, &menuItems[0], "Home", hometxt);
-  LCD_MENU_AddItem(&menuList, &menuItems[1], "Profiles", profiles);
-  LCD_MENU_AddItem(&menuList, &menuItems[2], "Temperatures", temperatures);
-  LCD_MENU_AddItem(&menuList, &menuItems[3], "Speed", speed);
-  LCD_MENU_AddItem(&menuList, &menuItems[4], "test1234", testStringArray1);
-  LCD_MENU_AddItem(&menuList, &menuItems[5], "test0312", testStringArray2);
+  LCD_MENU_ExtendList(&menuLists[0], &menuLists[1]);
+  //LCD_MENU_ExtendList(&menuLists[1], &menuLists[2]);
+
+  LCD_MENU_ItemInit(&menuItems[0], "Home", hometxt, ITEM_TYPE_DISPLAY);
+  LCD_MENU_ItemInit(&menuItems[1], "Profiles", profiles, ITEM_TYPE_CONFIG);
+  LCD_MENU_ItemInit(&menuItems[2], "Temperatures", temperatures, ITEM_TYPE_CONFIG);
+  LCD_MENU_ItemInit(&menuItems[3], "Speed", speed, ITEM_TYPE_CONFIG);
+  LCD_MENU_ItemInit(&menuItems[4], "test1234", testStringArray1, ITEM_TYPE_CONFIG);
+  LCD_MENU_ItemInit(&menuItems[5], "test0312", testStringArray2, ITEM_TYPE_CONFIG);
+  LCD_MENU_ItemInit(&menuItems[6], "Credits", credits, ITEM_TYPE_DISPLAY);
+
+  for (int i = 0, j = -1; i < 7; i++) {
+	  if (i % 4 == 0) {
+		  j++;
+	  }
+	  LCD_MENU_AddItemToList(&menuLists[j], &menuItems[i]);
+  }
 
 
+  LCD_MENU_List* headNode = &menuLists[0];
+  LCD_MENU_List* currentNode = headNode;
 
-
-
-  int selectedItem = 0;
-
+  LCD_MENU_PrintList (&menuLists[0]);
+  HAL_Delay(1000);
 
 
   /* USER CODE END 2 */
@@ -177,24 +197,22 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* USER CODE END WHILE */
-	  LCD_MENU_PrintList(&menuList, selectedItem++);
 
-	  HAL_Delay(2000);
-
-	  LCD_MENU_MoveCursor(&menuList, 1);
-
-	  HAL_Delay(2000);
-
-	  LCD_MENU_PrintItem(&menuList, 1);
-
-	  HAL_Delay(2000);
-
-	  selectedItem++;
-	  if (selectedItem > menuList.numItems) {
-		  selectedItem = 0;
+	  for (int i = 0; i < 10; i++) {
+		  LCD_MENU_PrintItem(currentNode);
+		  HAL_Delay(1000);
+		  LCD_MENU_PrintList (currentNode);
+		  HAL_Delay(1000);
+		  currentNode = LCD_MENU_MoveListCursor(currentNode, MV_CURSOR_DOWN);
+		  HAL_Delay(1000);
 	  }
 
+	  for (int i = 0; i < 10; i++) {
+		  currentNode = LCD_MENU_MoveListCursor(currentNode, MV_CURSOR_UP);
+		  HAL_Delay(1000);
+	  }
+
+    /* USER CODE END WHILE */
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */

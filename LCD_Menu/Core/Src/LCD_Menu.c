@@ -17,7 +17,95 @@ void LCD_MENU_ListInit (LCD_HandleTypeDef* hlcd, LCD_MENU_List* list) {
 	list->hlcd = hlcd;
 	list->cursor = 0;
 	list->numItems = 0;
-	list->printedIndex = 0;
+
+	for(int i = 0; i < 4; i++) {
+		list->items[i] = NULL;
+	}
+
+	list->parent = NULL;
+	list->child = NULL;
+}
+
+void LCD_MENU_ExtendList (LCD_MENU_List* parent, LCD_MENU_List* extension) {
+	parent->child = extension;
+	extension->parent = parent;
+}
+
+/**
+ * Increment the cursor on the list. if cursor is moved past list, print new list
+ * returns pointer to current printed list
+ */
+LCD_MENU_List* LCD_MENU_MoveListCursor (LCD_MENU_List* list, uint8_t direction) {
+	int prevCursor = list->cursor;
+
+	if (direction == 1) {
+		list->cursor++;
+	}
+	else {
+		list->cursor--;
+	}
+
+	//List cursor has past the end of list, go to child list
+	if(list->cursor > list->numItems - 1) {
+		if(list->child != NULL) {
+			list->cursor--;
+			LCD_MENU_PrintList(list->child);
+
+			return list->child;
+		}
+		else {
+			list->cursor--;
+		}
+	}
+	//List cursor has past the start of list, go to parent list
+	else if(list->cursor < 0) {
+		if(list->parent != NULL) {
+			list->cursor = 0;
+			LCD_MENU_PrintList(list->parent);
+
+			return list->parent;
+		}
+		else {
+			list->cursor++;
+		}
+	}
+
+	//Print cursor
+	LCD_SetCursor(list->hlcd, 0, prevCursor);
+	LCD_PrintChar(list->hlcd, ' ');
+
+	LCD_SetCursor(list->hlcd, 0, list->cursor);
+	LCD_PrintChar(list->hlcd, '>');
+
+	return list;
+}
+
+/**
+ * Initialize menu item. Sets the name and text of menu item.
+ * @param name is a string
+ * @param text is an array of strings
+ * text must have 4 strings
+ */
+void LCD_MENU_ItemInit (LCD_MENU_Item* item, char name[], char * text[], uint8_t type) {
+	item->itemName = name;
+
+	for(int i = 0; i < 4; i++) {
+
+		item->rowText[i] = text[i];
+	}
+
+	if(type <= 1) {
+			item->type = type;
+		}
+	else {
+		while(1);
+	}
+
+	/*
+	 * Pointers are implicity set to NULL, left here for readability
+	 * item->parent == NULL;
+	 * item->child == NULL;
+	*/
 }
 
 /**
@@ -26,103 +114,60 @@ void LCD_MENU_ListInit (LCD_HandleTypeDef* hlcd, LCD_MENU_List* list) {
  * @param text is an array of strings
  * text must have 4 strings
  */
-void LCD_MENU_AddItem (LCD_MENU_List* list, LCD_MENU_Item* item, char* name, char * text[]) {
+void LCD_MENU_AddItemToList (LCD_MENU_List* listHead, LCD_MENU_Item* item) {
 
-	item->itemName = name;
-
-	for(int i = 0; i < 4; i++) {
-
-		item->rowText[i] = text[i];
+	LCD_MENU_List* node = listHead;
+	while(node->numItems == 4) {
+		if(node->child != NULL) {
+			node = node->child;
+		}
+		else {
+			while(1);
+		}
 	}
+	node->items[node->numItems] = item;
+	node->numItems++;
 
-	list->items[list->numItems] = item;
-	list->numItems++;
 
 }
 
-/**
- * Print 4 elements from the list to the LCD
- * @param startIndex specifies what elements in the list will be printed
+/*
+ * Attach a menu item to another menu item, allowing for than 4 lines to be printed
  */
-void LCD_MENU_PrintList (LCD_MENU_List* list, int startIndex) {
-	if (startIndex > list->numItems) {
-		while(1);
-	}
+void LCD_MENU_ExtendItem(LCD_MENU_Item* parent, LCD_MENU_Item* extenstion) {
+	parent->child = extenstion;
+	extenstion->parent = parent;
+}
 
+/**
+ * Print the list and its cursor to the LCD
+ */
+void LCD_MENU_PrintList (LCD_MENU_List* list) {
 	LCD_Clear(list->hlcd);
-	list->printedIndex = startIndex;
+
+	//Print cursor
+	LCD_SetCursor(list->hlcd, 0, list->cursor);
+	LCD_PrintChar(list->hlcd, '>');
 
 	//i represents item index being printed
 	//j represents row to print data on
-	for( int i = startIndex, j = 0; i < list->numItems && j < 4; i++, j++) {
-		if(i == list->cursor) {
-			LCD_SetCursor(list->hlcd, 0, j);
-			LCD_Print(list->hlcd, ">");
-		}
-
+	for( int i = 0, j = 0; i < list->numItems && j < 4; i++, j++) {
 		LCD_SetCursor(list->hlcd, 1, j);
 		LCD_Print(list->hlcd, list->items[i]->itemName);
 	}
 }
 
-//TODO - Change to SetCursor which does not print to LCD, that will be left to application
-/**
- * Move the cursor up or down, reprint list if needed
- * @param direction defines move direction, up when -1 and down when 1
- */
-void LCD_MENU_MoveCursor (LCD_MENU_List* list, int direction) {
-	int prevCursor = list->cursor;
-	list->cursor += direction;
-
-	//list wraps around
-	if(list->cursor < 0) {
-		list->cursor = list->numItems;
-		if (list->numItems < 3) {
-			LCD_MENU_PrintList (list, 0);
-			list->cursor = 0;
-		}
-		else {
-			list->cursor = list->numItems - 3;
-			LCD_MENU_PrintList (list, list->numItems - 3);
-		}
-
-	}
-
-	else if(list->cursor > list->numItems-1) {
-		list->cursor = 0;
-		LCD_MENU_PrintList (list, 0);
-	}
-
-	else if(list->cursor - list->printedIndex > 3 || list->cursor - list->printedIndex < -3) {
-		LCD_MENU_PrintList (list, list->cursor - 3);
-	}
-
-	else {
-		LCD_SetCursor(list->hlcd, 0, prevCursor);
-		LCD_Print(list->hlcd, " ");
-
-		LCD_SetCursor(list->hlcd, 0, list->cursor);
-		LCD_Print(list->hlcd, ">");
-	}
-
-
-
-
-}
-
 
 /**
- * Print a menu item to the lcd at specifed starting column
- * @param column intended to provide room for the cursor if needed
- * //column is for print location on LCD, intended to provide room for cursor to select items.
+ * Print a menu item to the lcd based on the cursor location
  */
-void LCD_MENU_PrintItem (LCD_MENU_List* list, int column) {
+void LCD_MENU_PrintItem (LCD_MENU_List* list) {
 	LCD_MENU_Item* item = list->items[list->cursor];
 
 	LCD_Clear(list->hlcd);
 
 	for(int i = 0; i < 4; i++) {
-		LCD_SetCursor(list->hlcd, column, i);
+		LCD_SetCursor(list->hlcd, item->type, i);
 		LCD_Print(list->hlcd, item->rowText[i]);
 	}
 }
