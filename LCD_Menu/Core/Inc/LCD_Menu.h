@@ -19,13 +19,17 @@
 #define ITEM_TYPE_DISPLAY 0
 #define ITEM_TYPE_CONFIG 1
 
-//TODO - Determine if one struct with a "linked-list" structure would work
+#define ITEM_ACTION_EMPTY 0
+#define ITEM_ACTION_DATA 1
+#define ITEM_ACTION_RETURN 2
 
 typedef struct __LCD_MENU_Item {
+	LCD_HandleTypeDef* hlcd;
 	char * rowText[4];
 	char * itemName;
 	int type;
 	int cursor;
+	int rowType[4];
 	int dataElement[4];
 	struct __LCD_MENU_Item* parent;
 	struct __LCD_MENU_Item* child;
@@ -56,10 +60,14 @@ void LCD_MENU_AddItemToList (LCD_MENU_List* listHead, LCD_MENU_Item* item);
 /*
  * Menu Item Functions
  */
-void LCD_MENU_ItemInit (LCD_MENU_Item* item, char name[], char * text[], uint8_t type);
+void LCD_MENU_ItemInit (LCD_HandleTypeDef* hlcd, LCD_MENU_Item* item, char name[], char * text[], uint8_t type);
 
 void LCD_MENU_ExtendItem(LCD_MENU_Item* parent, LCD_MENU_Item* extenstion);
 
-void LCD_MENU_PrintItem (LCD_MENU_List* list);
+LCD_MENU_Item* LCD_MENU_MoveItemCursor (LCD_MENU_Item* list, uint8_t direction);
+
+void LCD_MENU_ItemSetAction (LCD_MENU_Item* item, uint8_t index, uint8_t action);
+
+void LCD_MENU_PrintItem (LCD_MENU_Item* list);
 
 #endif /* INC_LCD_MENU_H_ */

@@ -21,9 +21,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <stdio.h>
 #include "LCD_I2C.h"
-#include "LCD_Menu.h"
+#include "stdio.h"
+#include "LCD_Menu_Data.h"
 
 /* USER CODE END Includes */
 
@@ -34,7 +34,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define LCD_ADDRESS 0x20
 
 /* USER CODE END PD */
 
@@ -52,7 +51,6 @@ TIM_HandleTypeDef htim1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
 LCD_HandleTypeDef hlcd;
 
 /* USER CODE END PV */
@@ -63,71 +61,12 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM1_Init(void);
-void initializeMenu(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-LCD_MENU_List menuLists[3];
-LCD_MENU_Item menuItems[10];
-
-char * hometxt[4] =
-{
-		"Set temp",
-		"Current temp 1",
-		"Current temp 2",
-		"Process Name"
-};
-
-char * profiles[4] =
-{
-		"PEEK",
-		"PPE",
-		"milk jug",
-		""
-};
-
-char * temperatures[4] =
-{
-		"^..",
-		"group 1: 200",
-		"group 2: 220",
-		""
-};
-
-char * speed[4] =
-{
-		"Kp: 1",
-		"Ki: 0.5",
-		"",
-		""
-};
-
-char * testStringArray1[4] =
-{
-		"sadf",
-		"gfjh",
-		"kfghjk",
-		"hjh"
-};
-
-char * testStringArray2[4] =
-{
-		"asdf",
-		"Poudrier",
-		"Tevin",
-		""
-};
-
-char * credits[4] =
-{
-		"Tevin Poudrier",
-		"Jonah Shadley",
-		"Colson Miller",
-		"Josiah Mart"
-};
 
 /* USER CODE END 0 */
 
@@ -138,6 +77,8 @@ char * credits[4] =
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+
+	LCD_MENU_Data dataItem;
 
   /* USER CODE END 1 */
 
@@ -164,23 +105,17 @@ int main(void)
   MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_ALL);
+  LCD_Init(&hlcd, &hi2c1, 0x20);
 
-  initializeMenu();
+  LCD_Print(&hlcd, "Hello World!");
 
+  LCD_SetCursor(&hlcd, 1, 1);
+  LCD_Print(&hlcd, "Count: ");
 
-
-
-  LCD_MENU_List* headNode = &menuLists[0];
-  LCD_MENU_List* currentList = headNode;
-  LCD_MENU_Item* currentItem = NULL;
-
-  LCD_MENU_PrintList (headNode);
-  HAL_Delay(1000);
+  LCD_MENU_DataInit(&dataItem, &hlcd, 1, 17);
 
   uint8_t dir;
   uint8_t prevEncVal = 0;
-
-  uint8_t inItem = 0;
 
   /* USER CODE END 2 */
 
@@ -188,44 +123,31 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  dir = (TIM1->CR1 & 0x0010) >> 4;
+	  if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == 1) {
 
-	  if (inItem == 0) {
-		  if (prevEncVal != TIM1->CNT && dir == 1) {
-			  currentList = LCD_MENU_MoveListCursor(currentList, MV_CURSOR_DOWN);
-		  }
-		  else if (prevEncVal != TIM1->CNT && dir == 0) {
-			  currentList = LCD_MENU_MoveListCursor(currentList, MV_CURSOR_UP);
-		  }
-	  }
-	  else if(inItem == 1) {
-		  if (prevEncVal != TIM1->CNT && dir == 1) {
-			  currentItem = LCD_MENU_MoveItemCursor(currentItem, MV_CURSOR_DOWN);
-		  }
-		  else if (prevEncVal != TIM1->CNT && dir == 0) {
-			  currentItem = LCD_MENU_MoveItemCursor(currentItem, MV_CURSOR_UP);
-		  }
+		  LCD_SetCursor(&hlcd, 0, 1);
+		  LCD_Print(&hlcd, ">");
+		  HAL_Delay(200); //prevent debounce errors
 
-	  }
+		  while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) != 1) {
+			  dir = (TIM1->CR1 & 0x0010) >> 4;
 
+			  if (prevEncVal != TIM1->CNT && dir == 1) {
+				  LCD_MENU_DataIncrement(&dataItem, 1);
+			  }
+			  else if (prevEncVal != TIM1->CNT && dir == 0) {
+				  LCD_MENU_DataIncrement(&dataItem, 0);
+			  }
 
-	  //Select item
-	  if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == 1 && inItem == 0) {
-		  inItem = 1;
-		  currentItem = currentList->items[currentList->cursor];
-		  LCD_MENU_PrintItem(currentItem);
-	  }
-	  else if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == 1 && inItem == 1) {
-		  if (currentItem->rowType[currentItem->cursor] == ITEM_ACTION_RETURN) {
-			  inItem = 0;
-			  LCD_MENU_PrintList (currentList);
+			  prevEncVal = TIM1->CNT;
+
+			  HAL_Delay(50);
 		  }
-
+		  LCD_SetCursor(&hlcd, 0, 1);
+		  LCD_Print(&hlcd, " ");
 	  }
 
-	  prevEncVal = TIM1->CNT;
-
-	  HAL_Delay(50);
+	  HAL_Delay(100);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -341,8 +263,8 @@ static void MX_TIM1_Init(void)
   htim1.Init.Period = 255;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
-  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  sConfig.EncoderMode = TIM_ENCODERMODE_TI1;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
   sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
   sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
@@ -437,11 +359,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(Led_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PB5 */
-  GPIO_InitStruct.Pin = GPIO_PIN_5;
+  /*Configure GPIO pin : ENCODER_SW_Pin */
+  GPIO_InitStruct.Pin = ENCODER_SW_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(ENCODER_SW_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI4_15_IRQn, 0, 0);
@@ -452,36 +374,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
-void initializeMenu(void) {
-	LCD_Init(&hlcd, &hi2c1, LCD_ADDRESS);
-
-	LCD_MENU_ListInit(&hlcd, &menuLists[0]);
-	LCD_MENU_ListInit(&hlcd, &menuLists[1]);
-	LCD_MENU_ListInit(&hlcd, &menuLists[2]);
-
-	LCD_MENU_ExtendList(&menuLists[0], &menuLists[1]);
-	//LCD_MENU_ExtendList(&menuLists[1], &menuLists[2]);
-
-	LCD_MENU_ItemInit(&hlcd, &menuItems[0], "Home", hometxt, ITEM_TYPE_DISPLAY);
-
-	LCD_MENU_ItemInit(&hlcd, &menuItems[1], "Profiles", profiles, ITEM_TYPE_CONFIG);
-
-	LCD_MENU_ItemInit(&hlcd, &menuItems[2], "Temperatures", temperatures, ITEM_TYPE_CONFIG);
-	LCD_MENU_ItemSetAction(&menuItems[2], 0, ITEM_ACTION_RETURN);
-
-	LCD_MENU_ItemInit(&hlcd, &menuItems[3], "Speed", speed, ITEM_TYPE_CONFIG);
-	LCD_MENU_ItemInit(&hlcd, &menuItems[4], "test1234", testStringArray1, ITEM_TYPE_CONFIG);
-	LCD_MENU_ItemInit(&hlcd, &menuItems[5], "test0312", testStringArray2, ITEM_TYPE_CONFIG);
-	LCD_MENU_ItemInit(&hlcd, &menuItems[6], "Credits", credits, ITEM_TYPE_DISPLAY);
-
-	for (int i = 0, j = -1; i < 7; i++) {
-	  if (i % 4 == 0) {
-		  j++;
-	  }
-	  LCD_MENU_AddItemToList(&menuLists[j], &menuItems[i]);
-	}
-}
 
 /* USER CODE END 4 */
 
