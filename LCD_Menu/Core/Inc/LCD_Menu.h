@@ -10,6 +10,7 @@
 
 #include "LCD_I2C.h"
 #include "stm32c0xx_hal.h"
+#include "LCD_Menu_Data.h"
 
 #define MENU_STRING_LENGTH 16
 
@@ -27,10 +28,10 @@ typedef struct __LCD_MENU_Item {
 	LCD_HandleTypeDef* hlcd;
 	char * rowText[4];
 	char * itemName;
-	int type;
-	int cursor;
-	int rowType[4];
-	int dataElement[4];
+	uint8_t type;
+	uint8_t cursor;
+	uint8_t rowType[4];
+	LCD_MENU_Data* dataElement[4];
 	struct __LCD_MENU_Item* parent;
 	struct __LCD_MENU_Item* child;
 } LCD_MENU_Item;
@@ -38,8 +39,8 @@ typedef struct __LCD_MENU_Item {
 typedef struct __LCD_MENU_List {
 	LCD_HandleTypeDef* hlcd;
 	LCD_MENU_Item* items[4];
-	int cursor;
-	int numItems;
+	uint8_t cursor;
+	uint8_t numItems;
 	struct __LCD_MENU_List* parent;
 	struct __LCD_MENU_List* child;
 } LCD_MENU_List;
@@ -63,6 +64,8 @@ void LCD_MENU_AddItemToList (LCD_MENU_List* listHead, LCD_MENU_Item* item);
 void LCD_MENU_ItemInit (LCD_HandleTypeDef* hlcd, LCD_MENU_Item* item, char name[], char * text[], uint8_t type);
 
 void LCD_MENU_ExtendItem(LCD_MENU_Item* parent, LCD_MENU_Item* extenstion);
+
+void LCD_MENU_ItemAddData(LCD_MENU_Item* item, LCD_MENU_Data* dataItem);
 
 LCD_MENU_Item* LCD_MENU_MoveItemCursor (LCD_MENU_Item* list, uint8_t direction);
 

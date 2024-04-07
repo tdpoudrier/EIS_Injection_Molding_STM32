@@ -18,7 +18,7 @@ void LCD_MENU_ListInit (LCD_HandleTypeDef* hlcd, LCD_MENU_List* list) {
 	list->cursor = 0;
 	list->numItems = 0;
 
-	for(int i = 0; i < 4; i++) {
+	for(uint8_t i = 0; i < 4; i++) {
 		list->items[i] = NULL;
 	}
 
@@ -36,7 +36,7 @@ void LCD_MENU_ExtendList (LCD_MENU_List* parent, LCD_MENU_List* extension) {
  * returns pointer to current printed list
  */
 LCD_MENU_List* LCD_MENU_MoveListCursor (LCD_MENU_List* list, uint8_t direction) {
-	int prevCursor = list->cursor;
+	uint8_t prevCursor = list->cursor;
 
 	if (direction == 1) {
 		list->cursor++;
@@ -90,10 +90,11 @@ void LCD_MENU_ItemInit (LCD_HandleTypeDef* hlcd, LCD_MENU_Item* item, char name[
 	item->itemName = name;
 	item->hlcd = hlcd;
 
-	for(int i = 0; i < 4; i++) {
+	for(uint8_t i = 0; i < 4; i++) {
 
 		item->rowText[i] = text[i];
 		item->rowType[i] = ITEM_ACTION_EMPTY;
+		item->dataElement[i] = NULL;
 	}
 
 	if(type <= 1) {
@@ -133,16 +134,21 @@ void LCD_MENU_AddItemToList (LCD_MENU_List* listHead, LCD_MENU_Item* item) {
 
 }
 
-/*
- * Attach a menu item to another menu item, allowing for than 4 lines to be printed
+/**
+ * Increment the cursor on the list. if cursor is moved past list, print new list
+ * returns pointer to current printed list
  */
 void LCD_MENU_ExtendItem(LCD_MENU_Item* parent, LCD_MENU_Item* extenstion) {
 	parent->child = extenstion;
 	extenstion->parent = parent;
 }
 
+/**
+ * Increment the cursor on the list. if cursor is moved past list, print new list
+ * returns pointer to current printed list
+ */
 LCD_MENU_Item* LCD_MENU_MoveItemCursor (LCD_MENU_Item* item, uint8_t direction) {
-	int prevCursor = item->cursor;
+	uint8_t prevCursor = item->cursor;
 
 	if (item->type == ITEM_TYPE_DISPLAY) {
 		return item;
@@ -190,6 +196,9 @@ LCD_MENU_Item* LCD_MENU_MoveItemCursor (LCD_MENU_Item* item, uint8_t direction) 
 	return item;
 }
 
+/**
+ * Define the action of a menu item row
+ */
 void LCD_MENU_ItemSetAction (LCD_MENU_Item* item, uint8_t index, uint8_t action) {
 	if (action > 2 || index > 3) {
 		return;
@@ -210,7 +219,7 @@ void LCD_MENU_PrintList (LCD_MENU_List* list) {
 
 	//i represents item index being printed
 	//j represents row to print data on
-	for( int i = 0, j = 0; i < list->numItems && j < 4; i++, j++) {
+	for( uint8_t i = 0, j = 0; i < list->numItems && j < 4; i++, j++) {
 		LCD_SetCursor(list->hlcd, 1, j);
 		LCD_Print(list->hlcd, list->items[i]->itemName);
 	}
@@ -223,9 +232,26 @@ void LCD_MENU_PrintList (LCD_MENU_List* list) {
 void LCD_MENU_PrintItem (LCD_MENU_Item* item) {
 
 	LCD_Clear(item->hlcd);
-	for(int i = 0; i < 4; i++) {
+
+	LCD_SetCursor(item->hlcd, 0, item->cursor);
+	LCD_PrintChar(item->hlcd, '>');
+
+	for(uint8_t i = 0; i < 4; i++) {
 		LCD_SetCursor(item->hlcd, item->type, i);
 		LCD_Print(item->hlcd, item->rowText[i]);
+
+		if (item->dataElement[i] != NULL) {
+			LCD_MENU_DataPrint(item->dataElement[i]);
+		}
 	}
+}
+
+/**
+ * Add a data element to a menu item
+ */
+void LCD_MENU_ItemAddData(LCD_MENU_Item* item, LCD_MENU_Data* dataItem) {
+	uint8_t index = dataItem->rowPos;
+	item->dataElement[index] = dataItem;
+	item->rowType[index] = ITEM_ACTION_DATA;
 }
 
