@@ -56,6 +56,8 @@ UART_HandleTypeDef huart2;
 
 LCD_HandleTypeDef hlcd;
 
+volatile uint32_t counter = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -65,6 +67,9 @@ static void MX_I2C1_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM1_Init(void);
 void initializeMenu(void);
+uint8_t checkEncoderButtonChange (uint32_t, uint8_t*);
+GPIO_PinState readEncoderButton (void);
+uint32_t millis(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -154,6 +159,7 @@ int main(void)
 
   /* Configure the system clock */
   SystemClock_Config();
+  SysTick_Config(SystemCoreClock / 1000);
 
   /* USER CODE BEGIN SysInit */
 
@@ -181,6 +187,7 @@ int main(void)
 
   uint8_t dir;
   uint8_t prevEncVal = 0;
+  uint8_t prevEncSw = readEncoderButton();
 
   uint8_t inItem = 0;
   uint8_t editingData = 0;
@@ -214,13 +221,13 @@ int main(void)
 
 
 	  //Select item
-	  if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == 1 && inItem == 0 && editingData == 0) {
+	  if(checkEncoderButtonChange(5, &prevEncSw) == 1 && inItem == 0 && editingData == 0) {
 		  inItem = 1;
 		  currentItem = currentList->items[currentList->cursor];
 		  LCD_MENU_PrintItem(currentItem);
 	  }
 	  //Select item action
-	  else if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == 1 && inItem == 1 && editingData == 0) {
+	  else if(checkEncoderButtonChange(5, &prevEncSw) == 1 && inItem == 1 && editingData == 0) {
 		  if (currentItem->type == ITEM_TYPE_DISPLAY) {
 			  inItem = 0;
 			  LCD_MENU_PrintList (currentList);
@@ -233,7 +240,6 @@ int main(void)
 			  editingData = 1;
 			  LCD_SetCursor(&hlcd, 16, currentItem->cursor);
 			  LCD_PrintChar(&hlcd, '>');
-			  HAL_Delay(50);
 		  }
 
 
@@ -525,6 +531,25 @@ void initializeMenu(void) {
 	  }
 	  LCD_MENU_AddItemToList(&menuLists[j], &menuItems[i]);
 	}
+}
+
+uint8_t checkEncoderButtonChange (uint32_t interval, uint8_t * prevState) {
+	if (millis() % interval == 0) {
+		uint8_t newState = readEncoderButton();
+		if (newState != *prevState) {
+			return 1;
+			*prevState = newState;
+		}
+	}
+	return 0;
+}
+
+GPIO_PinState readEncoderButton () {
+	return HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5);
+}
+
+uint32_t millis() {
+	return counter;
 }
 
 /* USER CODE END 4 */

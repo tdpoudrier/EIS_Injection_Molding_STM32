@@ -24,6 +24,7 @@
 #include "LCD_I2C.h"
 #include "stdio.h"
 #include "LCD_Menu_Data.h"
+#include "encoder.h"
 
 /* USER CODE END Includes */
 
@@ -46,12 +47,14 @@
 
 I2C_HandleTypeDef hi2c1;
 
-TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 LCD_HandleTypeDef hlcd;
+
+ENC_Handle encoder;
 
 /* USER CODE END PV */
 
@@ -60,13 +63,16 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_TIM1_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+volatile uint32_t counter = 0;
+uint32_t prev_count = 0;
 
 /* USER CODE END 0 */
 
@@ -102,9 +108,9 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   MX_USART2_UART_Init();
-  MX_TIM1_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-  HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_ALL);
+  ENC_Init(&encoder, &htim3, GPIOB, GPIO_PIN_5);
   LCD_Init(&hlcd, &hi2c1, 0x20);
 
   LCD_Print(&hlcd, "Hello World!");
@@ -117,37 +123,49 @@ int main(void)
   uint8_t dir;
   uint8_t prevEncVal = 0;
 
+  uint8_t button_state = 0;
+  uint8_t encoder_count = 0;
+
+  uint8_t state = 0;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == 1) {
+	  button_state = ENC_ReadSwitch(&encoder);
+	  encoder_count = ENC_GetCount(&encoder);
+	  dir = ENC_GetDirection(&encoder);
 
+	  if(button_state == 1 && state == 0) {
+		  state = 1;
 		  LCD_SetCursor(&hlcd, 0, 1);
 		  LCD_Print(&hlcd, ">");
-		  HAL_Delay(200); //prevent debounce errors
-
-		  while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) != 1) {
-			  dir = (TIM1->CR1 & 0x0010) >> 4;
-
-			  if (prevEncVal != TIM1->CNT && dir == 1) {
-				  LCD_MENU_DataIncrement(&dataItem, 1);
-			  }
-			  else if (prevEncVal != TIM1->CNT && dir == 0) {
-				  LCD_MENU_DataIncrement(&dataItem, 0);
-			  }
-
-			  prevEncVal = TIM1->CNT;
-
-			  HAL_Delay(50);
-		  }
-		  LCD_SetCursor(&hlcd, 0, 1);
-		  LCD_Print(&hlcd, " ");
 	  }
 
-	  HAL_Delay(100);
+	  else if (state == 1) {
+		  if (button_state) {
+			  state = 0;
+			  LCD_SetCursor(&hlcd, 0, 1);
+			  LCD_Print(&hlcd, " ");
+		  }
+
+		  LCD_MENU_DataIncrement(&dataItem, 1);
+
+		  HAL_Delay(100);
+
+
+
+		  if (prevEncVal != encoder_count && counter - prev_count > 100) {
+			  LCD_MENU_DataIncrement(&dataItem, dir);
+			  prev_count = counter;
+			  prevEncVal = encoder_count;
+		  }
+	  }
+
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -240,30 +258,29 @@ static void MX_I2C1_Init(void)
 }
 
 /**
-  * @brief TIM1 Initialization Function
+  * @brief TIM3 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM1_Init(void)
+static void MX_TIM3_Init(void)
 {
 
-  /* USER CODE BEGIN TIM1_Init 0 */
+  /* USER CODE BEGIN TIM3_Init 0 */
 
-  /* USER CODE END TIM1_Init 0 */
+  /* USER CODE END TIM3_Init 0 */
 
   TIM_Encoder_InitTypeDef sConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
 
-  /* USER CODE BEGIN TIM1_Init 1 */
+  /* USER CODE BEGIN TIM3_Init 1 */
 
-  /* USER CODE END TIM1_Init 1 */
-  htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 0;
-  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 255;
-  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim1.Init.RepetitionCounter = 0;
-  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 0;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 255;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
   sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
   sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
@@ -273,20 +290,19 @@ static void MX_TIM1_Init(void)
   sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
   sConfig.IC2Filter = 0;
-  if (HAL_TIM_Encoder_Init(&htim1, &sConfig) != HAL_OK)
+  if (HAL_TIM_Encoder_Init(&htim3, &sConfig) != HAL_OK)
   {
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN TIM1_Init 2 */
+  /* USER CODE BEGIN TIM3_Init 2 */
 
-  /* USER CODE END TIM1_Init 2 */
+  /* USER CODE END TIM3_Init 2 */
 
 }
 

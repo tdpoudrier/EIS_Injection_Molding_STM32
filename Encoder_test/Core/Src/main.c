@@ -24,6 +24,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "string.h"
+#include "encoder.h"
+#include "stdio.h"
 
 /* USER CODE END Includes */
 
@@ -44,12 +46,16 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+
+ENC_Handle encoder;
+
+volatile uint32_t counter = 0;
+uint32_t prev_count = 0;
 
 /* USER CODE END PV */
 
@@ -58,13 +64,15 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+volatile uint32_t counter;
+uint32_t prevCount;
 
 /* USER CODE END 0 */
 
@@ -99,52 +107,44 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM3_Init();
   MX_USART2_UART_Init();
-  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
-  HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+  ENC_Init(&encoder, &htim3, GPIOB, GPIO_PIN_5);
 
-  sprintf( MSG, "Encoder Test\n\r");
+  //HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+
+  sprintf( (char*) MSG, "Encoder Test\n\r");
   HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
-  uint32_t prevCount = TIM3->CNT;
 
+  //sprintf((char*) MSG, "Encoder rotated counterclockwise, Encoder Ticks = %lu\n\r", ((TIM3->CNT)));
+  uint8_t encoder_count = 0;
+  uint8_t prev_enc_count = 0;
+  int button_count = 0;
+
+  int dir_count = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  encoder_count = ENC_GetCount(&encoder);
+	  if (ENC_ReadSwitch(&encoder) && counter - prevCount > 10) {
+		  button_count++;
+		  sprintf( (char*) MSG, "Button Pressed: %d, dir:%d\n\r          ", button_count, encoder_count);
+		  HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
+		  prevCount = counter;
 
-	  //If Encoder switch is pressed
-	  if(HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_3))
-	  {
-		  sprintf((char*) MSG, "Encoder Switch Pressed, Encoder Ticks = %lu\n\r", ((TIM3->CNT)));
-		  HAL_UART_Transmit(&huart2, MSG, (uint8_t) strlen( (char*) MSG), 100);
+	  }
+
+	  if (encoder_count != prev_enc_count) {
+		  sprintf( (char*) MSG, "count Changed: %d, dir count: %d\n\r       ", encoder_count, dir_count);
+		  HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
+		  prev_enc_count = encoder_count;
+		  dir_count++;
 	  }
 
 
 
-	  if (TIM3->CNT != prevCount) {
-
-		  //Get the direction of the encoder
-		  uint8_t dir = (TIM3->CR1 & 0x0010) >> 4;
-
-		  //Print direction
-		  if ( dir == 0) {
-			  sprintf((char*) MSG, "Encoder rotated counterclockwise, Encoder Ticks = %lu\n\r", ((TIM3->CNT)));
-			  HAL_UART_Transmit(&huart2, MSG, (uint8_t) strlen( (char*) MSG), 100);
-		  }
-		  else {
-			  sprintf((char*) MSG, "Encoder rotated clockwise, Encoder Ticks = %lu\n\r", ((TIM3->CNT)));
-			  HAL_UART_Transmit(&huart2, MSG, (uint8_t) strlen( (char*) MSG), 100);
-		  }
-	  }
-
-	  // Set channel one output to the encoder count
-	  TIM1->CCR1 = TIM3->CNT;
-
-	  prevCount = TIM3->CNT;
-	  HAL_Delay(10);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -189,88 +189,6 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief TIM1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM1_Init(void)
-{
-
-  /* USER CODE BEGIN TIM1_Init 0 */
-
-  /* USER CODE END TIM1_Init 0 */
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_OC_InitTypeDef sConfigOC = {0};
-  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
-
-  /* USER CODE BEGIN TIM1_Init 1 */
-
-  /* USER CODE END TIM1_Init 1 */
-  htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 0;
-  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 255;
-  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim1.Init.RepetitionCounter = 0;
-  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 127;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
-  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
-  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
-  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
-  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
-  sBreakDeadTimeConfig.DeadTime = 0;
-  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
-  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
-  sBreakDeadTimeConfig.BreakFilter = 0;
-  sBreakDeadTimeConfig.BreakAFMode = TIM_BREAK_AFMODE_INPUT;
-  sBreakDeadTimeConfig.Break2State = TIM_BREAK2_DISABLE;
-  sBreakDeadTimeConfig.Break2Polarity = TIM_BREAK2POLARITY_HIGH;
-  sBreakDeadTimeConfig.Break2Filter = 0;
-  sBreakDeadTimeConfig.Break2AFMode = TIM_BREAK_AFMODE_INPUT;
-  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
-  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM1_Init 2 */
-
-  /* USER CODE END TIM1_Init 2 */
-  HAL_TIM_MspPostInit(&htim1);
-
-}
-
-/**
   * @brief TIM3 Initialization Function
   * @param None
   * @retval None
@@ -292,17 +210,17 @@ static void MX_TIM3_Init(void)
   htim3.Init.Prescaler = 0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim3.Init.Period = 255;
-  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV2;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
+  sConfig.EncoderMode = TIM_ENCODERMODE_TI1;
   sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
   sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC1Filter = 10;
+  sConfig.IC1Filter = 0;
   sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
   sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC2Filter = 10;
+  sConfig.IC2Filter = 0;
   if (HAL_TIM_Encoder_Init(&htim3, &sConfig) != HAL_OK)
   {
     Error_Handler();
