@@ -24,6 +24,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "LCD_I2C.h"
+#include "MAX31855.h"
 
 /* USER CODE END Includes */
 
@@ -34,6 +35,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define LCD_ADDRESS 0x20
+#define MAX_LENGTH 25
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -77,7 +80,8 @@ static void MX_USART2_UART_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	char buffer[21] = {0};
+	char uart_buf[21] = {0};
+	int uart_buf_len;
 
   /* USER CODE END 1 */
 
@@ -103,7 +107,8 @@ int main(void)
   MX_SPI1_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  	  /*
+
+	 /* Initialize peripherals
 	 * MISO is PB4/D5
 	 * CLK is PB3/D3
 	 * CS is PB5/D6
@@ -111,11 +116,11 @@ int main(void)
 	MAX_Init(&max31855, &hspi1, GPIO_PIN_5, GPIOB);
 	LCD_Init(&hlcd, &hi2c1, LCD_ADDRESS);
 
-	//Say something
 	uart_buf_len = sprintf(uart_buf, "LCD MAX31866 Test\r\n");
 	HAL_UART_Transmit(&huart2, (uint8_t *) uart_buf, uart_buf_len, 100);
 
 	uint32_t celcius = 0;
+	uint32_t setTemp = 35;
 
   /* USER CODE END 2 */
 
@@ -129,11 +134,27 @@ int main(void)
 	  uart_buf_len = sprintf(uart_buf, "Temp in C: %d.%d\r\n", tempCel/100, tempCel % 100);
 	  HAL_UART_Transmit(&huart2, (uint8_t *) uart_buf, uart_buf_len, 100);
 
-	  snprintf(buffer, 21, "Temperature:%d.%d", tempCel/100, tempCel % 100);
-	  LCD_SetCursor(&hlcd, 0, currentRow);
-	  LCD_Print(&hlcd, buffer);
 
-	  HAL_Delay(1000);
+	  snprintf(uart_buf, 21, "Set Temp:%d.00  ", (int) setTemp);
+	  LCD_SetCursor(&hlcd, 0, 0);
+	  LCD_Print(&hlcd, uart_buf);
+
+	  snprintf(uart_buf, 21, "Current Temp:%d.%d  ", tempCel/100, tempCel % 100);
+	  LCD_SetCursor(&hlcd, 0, 1);
+	  LCD_Print(&hlcd, uart_buf);
+
+	  if (celcius/100 < setTemp) {
+		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+		  LCD_SetCursor(&hlcd, 0, 2);
+		  LCD_Print(&hlcd, "Heat Band Active");
+	  }
+	  else {
+		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+		  LCD_SetCursor(&hlcd, 0, 2);
+		  LCD_Print(&hlcd, "Heat Band Off   ");
+	  }
+
+	  HAL_Delay(10);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -248,7 +269,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
