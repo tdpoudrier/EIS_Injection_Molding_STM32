@@ -100,6 +100,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
+  SysTick_Config(SystemCoreClock / 1000); //set to 1ms per tick
 
   /* USER CODE END SysInit */
 
@@ -108,7 +109,7 @@ int main(void)
   MX_TIM3_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  ENC_Init(&encoder, &htim3, GPIOB, GPIO_PIN_5);
+  ENC_Init(&encoder, &htim3, GPIOA, GPIO_PIN_9);
 
   //HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 
@@ -117,7 +118,6 @@ int main(void)
 
   //sprintf((char*) MSG, "Encoder rotated counterclockwise, Encoder Ticks = %lu\n\r", ((TIM3->CNT)));
   uint8_t encoder_count = 0;
-  uint8_t prev_enc_count = 0;
   int button_count = 0;
 
   int dir_count = 0;
@@ -136,10 +136,9 @@ int main(void)
 
 	  }
 
-	  if (encoder_count != prev_enc_count) {
+	  if (ENC_CountChange(&encoder) == 1) {
 		  sprintf( (char*) MSG, "count Changed: %d, dir count: %d\n\r       ", encoder_count, dir_count);
 		  HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
-		  prev_enc_count = encoder_count;
 		  dir_count++;
 	  }
 

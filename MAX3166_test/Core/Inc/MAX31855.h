@@ -18,7 +18,7 @@ typedef struct __MAX31855_struct {
 
 void MAX_Init (MAX31855_HandleTypeDef *hmax,SPI_HandleTypeDef *hspi, uint16_t csPin, GPIO_TypeDef *csPort);
 
-int MAX_GetCelcius (MAX31855_HandleTypeDef * maxPtr);
+int16_t MAX_GetCelcius (MAX31855_HandleTypeDef * maxPtr);
 
 
 #endif /* INC_MAX31855_H_ */

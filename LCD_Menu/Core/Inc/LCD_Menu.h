@@ -29,7 +29,7 @@ typedef struct __LCD_MENU_Item {
 	char * rowText[4];
 	char * itemName;
 	uint8_t type;
-	uint8_t cursor;
+	int8_t cursor;
 	uint8_t rowType[4];
 	LCD_MENU_Data* dataElement[4];
 	struct __LCD_MENU_Item* parent;
@@ -39,7 +39,7 @@ typedef struct __LCD_MENU_Item {
 typedef struct __LCD_MENU_List {
 	LCD_HandleTypeDef* hlcd;
 	LCD_MENU_Item* items[4];
-	uint8_t cursor;
+	int8_t cursor;
 	uint8_t numItems;
 	struct __LCD_MENU_List* parent;
 	struct __LCD_MENU_List* child;
