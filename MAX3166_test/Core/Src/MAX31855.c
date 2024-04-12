@@ -18,7 +18,7 @@ void MAX_Init (MAX31855_HandleTypeDef *hmax,SPI_HandleTypeDef *hspi, uint16_t cs
 
 }
 
-int MAX_GetCelcius (MAX31855_HandleTypeDef * maxPtr) {
+int16_t MAX_GetCelcius (MAX31855_HandleTypeDef * maxPtr) {
 
 	uint8_t spi_buf[4] = {0};
 
@@ -36,7 +36,7 @@ int MAX_GetCelcius (MAX31855_HandleTypeDef * maxPtr) {
 	//Convert binary data to celcius
 	float celcius = (data >> 18) * 0.25;
 
-	return (int) (celcius * 100);
+	return (int16_t) (celcius);
 }
 
 //Read 32 bits from MAX3166

@@ -22,7 +22,11 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "encoder.h"
-#include "stdio.h"
+#include <stdio.h>
+#include "LCD_I2C.h"
+#include "LCD_Menu.h"
+#include "LCD_Menu_Data.h"
+#include "MAX31855.h"
 
 /* USER CODE END Includes */
 
@@ -33,6 +37,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define LCD_ADDRESS 0x20
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -54,6 +59,11 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 ENC_Handle encoder;
 
+LCD_HandleTypeDef hlcd;
+
+MAX31855_HandleTypeDef hmax1;
+MAX31855_HandleTypeDef hmax2;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -72,6 +82,19 @@ static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN 0 */
 volatile uint32_t counter = 0;
 uint32_t prevCount;
+
+//Allocate menu elements
+LCD_MENU_List menuLists[3];
+LCD_MENU_Item menuItems[10];
+LCD_MENU_Data dataItems[10];
+
+char * hometxt[4] =
+{
+		"Set temp",
+		"Current temp 1",
+		"Current temp 2",
+		"Process Name"
+};
 
 /* USER CODE END 0 */
 
@@ -99,6 +122,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
+  SysTick_Config(SystemCoreClock / 1000); //set to 1ms per tick
 
   /* USER CODE END SysInit */
 
@@ -110,15 +134,37 @@ int main(void)
   MX_TIM3_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+
+  //Initalize peripherials
   ENC_Init(&encoder, &htim3, GPIOA, GPIO_PIN_9);
+  LCD_Init(&hlcd, &hi2c1, LCD_ADDRESS);
+  MAX_Init(&hmax1, &hspi1, GPIO_PIN_15, GPIOA);
+
+  //Create main menu
+  LCD_MENU_ListInit(&hlcd, &menuLists[0]);
+  LCD_MENU_ListInit(&hlcd, &menuLists[1]);
+  LCD_MENU_ExtendList(&menuLists[0], &menuLists[1]);
+
+  //Create menu item
+  LCD_MENU_ItemInit(&hlcd, &menuItems[0], "Home", hometxt, ITEM_TYPE_DISPLAY);
+  LCD_MENU_DataInit(&dataItems[0], &hlcd, 2, 17);
+  LCD_MENU_ItemAddData(&menuItems[0], &dataItems[0]);
+  dataItems[0].value = 200;
+
+
+  LCD_MENU_AddItemToList(&menuLists[0], &menuItems[0]);
 
 //HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-  sprintf( (char*) MSG, "Encoder Test\n\r");
+  sprintf( (char*) MSG, "EIS Injection Molding\n\r");
   HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
 
-  //sprintf((char*) MSG, "Encoder rotated counterclockwise, Encoder Ticks = %lu\n\r", ((TIM3->CNT)));
-  uint8_t encoder_count = 0;
-  uint8_t prev_enc_count = 0;
+  uint8_t state = ST_MENU;
+
+  LCD_MENU_List* headList = &menuLists[0];
+  LCD_MENU_List* currentList = headList;
+  LCD_MENU_Item* currentItem = NULL;
+
+  LCD_MENU_PrintList (headList);
 
   /* USER CODE END 2 */
 
@@ -126,6 +172,47 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  if (state == ST_MENU) {
+		  if (ENC_ReadSwitch(&encoder) == HIGH) {
+			  state = ST_ITEM;
+			  currentItem = currentList->items[currentList->cursor];
+			  LCD_MENU_PrintItem(currentItem);
+		  }
+		  else if (ENC_CountChange(&encoder) == TRUE) {
+			  uint8_t direction = ENC_GetDirection(&encoder);
+			  currentList = LCD_MENU_MoveListCursor(currentList, direction);
+		  }
+	  }
+	  else if (state == ST_ITEM) {
+		  if (currentItem->type == ITEM_TYPE_DISPLAY) {
+			  LCD_MENU_UpdateItemData(currentItem);
+		  }
+
+		  if (ENC_ReadSwitch(&encoder) == HIGH) {
+			  if (currentItem->type == ITEM_TYPE_DISPLAY) {
+				  state = ST_MENU;
+				  LCD_MENU_PrintList (currentList);
+			  }
+			  else if (currentItem->rowType[currentItem->cursor] == ITEM_ACTION_RETURN) {
+				  state = ST_MENU;
+				  LCD_MENU_PrintList (currentList);
+			  }
+			  else if (currentItem->rowType[currentItem->cursor] == ITEM_ACTION_DATA) {
+				  state = ST_MENU;
+				  LCD_MENU_PrintList (currentList);
+//				  editingData = 1;
+//				  LCD_SetCursor(&hlcd, 16, currentItem->cursor);
+//				  LCD_PrintChar(&hlcd, '>');
+			  }
+		  }
+	  }
+	  else if (state == ST_DATA) {
+
+	  }
+
+	  dataItems[0].value = MAX_GetCelcius(&hmax1);
+
+	  HAL_Delay(10);
 
     /* USER CODE END WHILE */
 
@@ -427,6 +514,8 @@ static void MX_USART2_UART_Init(void)
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
+/* USER CODE BEGIN MX_GPIO_Init_1 */
+/* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -480,6 +569,8 @@ static void MX_GPIO_Init(void)
   HAL_NVIC_SetPriority(EXTI4_15_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
 
+/* USER CODE BEGIN MX_GPIO_Init_2 */
+/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */

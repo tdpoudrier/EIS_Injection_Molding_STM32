@@ -39,14 +39,18 @@ uint8_t ENC_GetDirection (ENC_Handle* encoder) {
 }
 
 uint32_t ENC_GetCount (ENC_Handle* encoder) {
-	uint32_t count = encoder->htim->CNT;
+	return encoder->htim->CNT;
+}
 
-	 if (count - encoder->prevCount > 3 || encoder->prevCount - count > 3) {
-		 encoder->prevCount = count;
-		 return count;
-	 }
-	 else {
-		 return encoder->prevCount;
-	 }
+uint8_t ENC_CountChange (ENC_Handle* encoder) {
+	uint32_t count = ENC_GetCount(encoder);
+
+	if (count - encoder->prevCount > ENC_THRESHOLD) {
+		encoder->prevCount = count;
+		return 1;
+	}
+	else {
+		return 0;
+	}
 }
 

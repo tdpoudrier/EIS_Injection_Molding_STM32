@@ -45,20 +45,8 @@ LCD_MENU_List* LCD_MENU_MoveListCursor (LCD_MENU_List* list, uint8_t direction) 
 		list->cursor--;
 	}
 
-	//List cursor has past the end of list, go to child list
-	if(list->cursor > list->numItems - 1) {
-		if(list->child != NULL) {
-			list->cursor--;
-			LCD_MENU_PrintList(list->child);
-
-			return list->child;
-		}
-		else {
-			list->cursor--;
-		}
-	}
 	//List cursor has past the start of list, go to parent list
-	else if(list->cursor < 0) {
+	if(list->cursor < 0) {
 		if(list->parent != NULL) {
 			list->cursor = 0;
 			LCD_MENU_PrintList(list->parent);
@@ -69,6 +57,20 @@ LCD_MENU_List* LCD_MENU_MoveListCursor (LCD_MENU_List* list, uint8_t direction) 
 			list->cursor++;
 		}
 	}
+
+	//List cursor has past the end of list, go to child list
+	else if(list->cursor > list->numItems - 1) {
+		if(list->child != NULL) {
+			list->cursor--;
+			LCD_MENU_PrintList(list->child);
+
+			return list->child;
+		}
+		else {
+			list->cursor--;
+		}
+	}
+
 
 	//Print cursor
 	LCD_SetCursor(list->hlcd, 0, prevCursor);
