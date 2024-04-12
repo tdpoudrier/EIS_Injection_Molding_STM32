@@ -46,6 +46,14 @@ extern "C" {
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
+#define ST_MENU 0
+#define ST_ITEM 1
+#define ST_DATA 2
+
+#define TRUE 1
+#define FALSE 0
+#define HIGH 1
+#define LOW 0
 
 /* USER CODE END EM */
 

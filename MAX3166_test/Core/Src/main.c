@@ -104,7 +104,7 @@ int main(void)
    * CLK is PB3/D3
    * CS is PB5/D6
    */
-  MAX_Init(&max31855, &hspi1, GPIO_PIN_5, GPIOB);
+  MAX_Init(&max31855, &hspi1, GPIO_PIN_15, GPIOA);
 
   //Say something
   uart_buf_len = sprintf(uart_buf, "SPI Test\r\n");
@@ -121,13 +121,12 @@ int main(void)
 	  celcius = MAX_GetCelcius(&max31855);
 
 	  int tempCel = celcius;
-	  uart_buf_len = sprintf(uart_buf, "Temp in C: %d.%d\r\n", tempCel/100, tempCel % 100);
+	  uart_buf_len = sprintf(uart_buf, "Temp in C: %d\r\n", tempCel);
 	  HAL_UART_Transmit(&huart2, (uint8_t *) uart_buf, uart_buf_len, 100);
 
 	  HAL_Delay(1000);
 
-	  /* USER CODE END WHILE */
-
+    /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
@@ -254,6 +253,8 @@ static void MX_USART2_UART_Init(void)
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
+/* USER CODE BEGIN MX_GPIO_Init_1 */
+/* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -307,6 +308,8 @@ static void MX_GPIO_Init(void)
   HAL_NVIC_SetPriority(EXTI4_15_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
 
+/* USER CODE BEGIN MX_GPIO_Init_2 */
+/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */

@@ -10,6 +10,7 @@
 
 #include "main.h"
 
+#define ENC_THRESHOLD 3
 
 typedef struct __encoder_Handle {
 	TIM_TypeDef* htim;
@@ -26,6 +27,8 @@ uint8_t ENC_ReadSwitch (ENC_Handle* encoder);
 uint8_t ENC_GetDirection (ENC_Handle* encoder);
 
 uint32_t ENC_GetCount (ENC_Handle* encoder);
+
+uint8_t ENC_CountChange (ENC_Handle* encoder);
 
 
 

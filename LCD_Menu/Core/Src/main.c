@@ -48,7 +48,7 @@
 
 I2C_HandleTypeDef hi2c1;
 
-TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart2;
 
@@ -57,6 +57,7 @@ UART_HandleTypeDef huart2;
 LCD_HandleTypeDef hlcd;
 
 volatile uint32_t counter = 0;
+uint32_t prev_count = 0;
 
 /* USER CODE END PV */
 
@@ -65,12 +66,12 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_TIM1_Init(void);
-void initializeMenu(void);
-uint8_t checkEncoderButtonChange (uint32_t, uint8_t*);
-GPIO_PinState readEncoderButton (void);
-uint32_t millis(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
+void initializeMenu(void);
+uint8_t checkEncoderButtonChange (uint32_t interval, uint8_t * prevState);
+GPIO_PinState readEncoderButton ();
+uint32_t millis();
 
 /* USER CODE END PFP */
 
@@ -159,9 +160,9 @@ int main(void)
 
   /* Configure the system clock */
   SystemClock_Config();
-  SysTick_Config(SystemCoreClock / 1000);
 
   /* USER CODE BEGIN SysInit */
+  SysTick_Config(SystemCoreClock / 1000); //set to 1ms per tick
 
   /* USER CODE END SysInit */
 
@@ -169,9 +170,9 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   MX_USART2_UART_Init();
-  MX_TIM1_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-  HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_ALL);
+  HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
 
   initializeMenu();
 
@@ -187,7 +188,6 @@ int main(void)
 
   uint8_t dir;
   uint8_t prevEncVal = 0;
-  uint8_t prevEncSw = readEncoderButton();
 
   uint8_t inItem = 0;
   uint8_t editingData = 0;
@@ -198,22 +198,22 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  dir = (TIM1->CR1 & 0x0010) >> 4;
+	  dir = (TIM3->CR1 & 0x0010) >> 4;
 
 	  //Move cursor
 	  if (inItem == 0) {
-		  if (prevEncVal != TIM1->CNT && dir == 1) {
+		  if (prevEncVal - TIM3->CNT > 2 && dir == 1) {
 			  currentList = LCD_MENU_MoveListCursor(currentList, MV_CURSOR_DOWN);
 		  }
-		  else if (prevEncVal != TIM1->CNT && dir == 0) {
+		  else if (TIM3->CNT - prevEncVal > 2 && dir == 0) {
 			  currentList = LCD_MENU_MoveListCursor(currentList, MV_CURSOR_UP);
 		  }
 	  }
 	  else if(inItem == 1 && editingData == 0) {
-		  if (prevEncVal != TIM1->CNT && dir == 1) {
+		  if (prevEncVal - TIM3->CNT > 2 && dir == 1) {
 			  currentItem = LCD_MENU_MoveItemCursor(currentItem, MV_CURSOR_DOWN);
 		  }
-		  else if (prevEncVal != TIM1->CNT && dir == 0) {
+		  else if (TIM3->CNT - prevEncVal > 2 && dir == 0) {
 			  currentItem = LCD_MENU_MoveItemCursor(currentItem, MV_CURSOR_UP);
 		  }
 
@@ -221,13 +221,13 @@ int main(void)
 
 
 	  //Select item
-	  if(checkEncoderButtonChange(5, &prevEncSw) == 1 && inItem == 0 && editingData == 0) {
+	  if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_9) == 1 && inItem == 0 && editingData == 0) {
 		  inItem = 1;
 		  currentItem = currentList->items[currentList->cursor];
 		  LCD_MENU_PrintItem(currentItem);
 	  }
 	  //Select item action
-	  else if(checkEncoderButtonChange(5, &prevEncSw) == 1 && inItem == 1 && editingData == 0) {
+	  else if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_9) == 1 && inItem == 1 && editingData == 0) {
 		  if (currentItem->type == ITEM_TYPE_DISPLAY) {
 			  inItem = 0;
 			  LCD_MENU_PrintList (currentList);
@@ -247,17 +247,20 @@ int main(void)
 
 	  //Editing data
 	  if (editingData == 1) {
-		  if (prevEncVal != TIM1->CNT) {
+		  if (prevEncVal != TIM3->CNT) {
 			  LCD_MENU_DataIncrement(currentItem->dataElement[currentItem->cursor], dir);
 		  }
-		  if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == 1) {
+		  if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_9) == 1) {
 			  editingData = 0;
 			  LCD_SetCursor(&hlcd, 16, currentItem->cursor);
 			  LCD_PrintChar(&hlcd, ' ');
 		  }
 	  }
 
-	  prevEncVal = TIM1->CNT;
+	  if (counter - prev_count > 10) {
+		  prevEncVal = TIM3->CNT;
+	  }
+
 
 	  HAL_Delay(50);
 
@@ -354,31 +357,30 @@ static void MX_I2C1_Init(void)
 }
 
 /**
-  * @brief TIM1 Initialization Function
+  * @brief TIM3 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM1_Init(void)
+static void MX_TIM3_Init(void)
 {
 
-  /* USER CODE BEGIN TIM1_Init 0 */
+  /* USER CODE BEGIN TIM3_Init 0 */
 
-  /* USER CODE END TIM1_Init 0 */
+  /* USER CODE END TIM3_Init 0 */
 
   TIM_Encoder_InitTypeDef sConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
 
-  /* USER CODE BEGIN TIM1_Init 1 */
+  /* USER CODE BEGIN TIM3_Init 1 */
 
-  /* USER CODE END TIM1_Init 1 */
-  htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 0;
-  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 255;
-  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim1.Init.RepetitionCounter = 0;
-  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  sConfig.EncoderMode = TIM_ENCODERMODE_TI1;
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 0;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 255;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
   sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
   sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
@@ -387,20 +389,19 @@ static void MX_TIM1_Init(void)
   sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
   sConfig.IC2Filter = 0;
-  if (HAL_TIM_Encoder_Init(&htim1, &sConfig) != HAL_OK)
+  if (HAL_TIM_Encoder_Init(&htim3, &sConfig) != HAL_OK)
   {
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN TIM1_Init 2 */
+  /* USER CODE BEGIN TIM3_Init 2 */
 
-  /* USER CODE END TIM1_Init 2 */
+  /* USER CODE END TIM3_Init 2 */
 
 }
 
@@ -473,11 +474,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(Led_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PB5 */
-  GPIO_InitStruct.Pin = GPIO_PIN_5;
+  /*Configure GPIO pin : PA9 */
+  GPIO_InitStruct.Pin = GPIO_PIN_9;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI4_15_IRQn, 0, 0);
