@@ -23,7 +23,7 @@ int16_t MAX_GetCelcius (MAX31855_HandleTypeDef * maxPtr) {
 	uint8_t spi_buf[4] = {0};
 
 	HAL_GPIO_WritePin(maxPtr->csPort, maxPtr->csPin, GPIO_PIN_RESET);
-	HAL_SPI_Receive(maxPtr->hspi, (uint8_t *) spi_buf, 4, 100);
+	HAL_StatusTypeDef status = HAL_SPI_Receive(maxPtr->hspi, (uint8_t *) spi_buf, 4, 100);
 	HAL_GPIO_WritePin(maxPtr->csPort, maxPtr->csPin, GPIO_PIN_SET);
 
 	//Assemble data into one int variable

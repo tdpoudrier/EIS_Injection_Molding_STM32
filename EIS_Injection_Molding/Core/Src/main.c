@@ -96,6 +96,23 @@ char * hometxt[4] =
 		"Process Name"
 };
 
+char * debugTxt[4] =
+{
+		"^..",
+		"Piston",
+		"H Door",
+		"LED"
+};
+
+char * temperatureTxt[4] =
+{
+		"^..",
+		"Set Temp 1",
+		"Heating",
+		""
+};
+
+
 /* USER CODE END 0 */
 
 /**
@@ -104,6 +121,7 @@ char * hometxt[4] =
   */
 int main(void)
 {
+
   /* USER CODE BEGIN 1 */
 	uint8_t MSG[100] = {'\0'};
 
@@ -122,7 +140,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-  SysTick_Config(SystemCoreClock / 1000); //set to 1ms per tick
+  //SysTick_Config(SystemCoreClock / 1000); //set to 1ms per tick
 
   /* USER CODE END SysInit */
 
@@ -147,15 +165,34 @@ int main(void)
 
   //Create menu item
   LCD_MENU_ItemInit(&hlcd, &menuItems[0], "Home", hometxt, ITEM_TYPE_DISPLAY);
-  LCD_MENU_DataInit(&dataItems[0], &hlcd, 2, 17);
-  LCD_MENU_ItemAddData(&menuItems[0], &dataItems[0]);
-  dataItems[0].value = 200;
+  LCD_MENU_DataInit(&dataItems[4], &hlcd); // set temp
+  LCD_MENU_DataInit(&dataItems[0], &hlcd);
+  LCD_MENU_ItemAddData(&menuItems[0], &dataItems[0], 1, ITEM_ACTION_DATA); // current temp 1
+  LCD_MENU_ItemAddData(&menuItems[0], &dataItems[4], 0,  ITEM_ACTION_DATA); // set temp
 
+  //Create debug item
+  LCD_MENU_ItemInit(&hlcd, &menuItems[1], "Debug", debugTxt, ITEM_TYPE_CONFIG);
+  LCD_MENU_DataInit(&dataItems[1], &hlcd); // piston
+  LCD_MENU_DataInit(&dataItems[2], &hlcd); // h door
+  LCD_MENU_DataInit(&dataItems[3], &hlcd); // led
+  LCD_MENU_ItemAddData(&menuItems[1], &dataItems[1], 1, ITEM_ACTION_TOGGLE);
+  LCD_MENU_ItemAddData(&menuItems[1], &dataItems[2], 2, ITEM_ACTION_TOGGLE);
+  LCD_MENU_ItemAddData(&menuItems[1], &dataItems[3], 3, ITEM_ACTION_TOGGLE);
+  LCD_MENU_ItemSetAction(&menuItems[1], 0, ITEM_ACTION_RETURN);
+
+  //Create Temperature item
+  LCD_MENU_ItemInit(&hlcd, &menuItems[2], "Temperature", temperatureTxt, ITEM_TYPE_CONFIG);
+  LCD_MENU_DataInit(&dataItems[5], &hlcd); // heating on/off
+  LCD_MENU_ItemAddData(&menuItems[2], &dataItems[4], 1, ITEM_ACTION_DATA); //set temp
+  LCD_MENU_ItemAddData(&menuItems[2], &dataItems[5], 2, ITEM_ACTION_TOGGLE); // heating on/off
+  LCD_MENU_ItemSetAction(&menuItems[2], 0, ITEM_ACTION_RETURN);
 
   LCD_MENU_AddItemToList(&menuLists[0], &menuItems[0]);
+  LCD_MENU_AddItemToList(&menuLists[0], &menuItems[1]);
+  LCD_MENU_AddItemToList(&menuLists[0], &menuItems[2]);
 
 //HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-  sprintf( (char*) MSG, "EIS Injection Molding\n\r");
+  sprintf( (char*) MSG, "EIS Injection Molding %d\n\r", MAX_GetCelcius(&hmax1));
   HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
 
   uint8_t state = ST_MENU;
@@ -165,6 +202,8 @@ int main(void)
   LCD_MENU_Item* currentItem = NULL;
 
   LCD_MENU_PrintList (headList);
+
+  dataItems[4].value = 50; //set temp to 50
 
   /* USER CODE END 2 */
 
@@ -190,6 +229,7 @@ int main(void)
 
 		  if (ENC_ReadSwitch(&encoder) == HIGH) {
 			  if (currentItem->type == ITEM_TYPE_DISPLAY) {
+
 				  state = ST_MENU;
 				  LCD_MENU_PrintList (currentList);
 			  }
@@ -198,17 +238,31 @@ int main(void)
 				  LCD_MENU_PrintList (currentList);
 			  }
 			  else if (currentItem->rowType[currentItem->cursor] == ITEM_ACTION_DATA) {
-				  state = ST_MENU;
-				  LCD_MENU_PrintList (currentList);
-//				  editingData = 1;
-//				  LCD_SetCursor(&hlcd, 16, currentItem->cursor);
-//				  LCD_PrintChar(&hlcd, '>');
+				  state = ST_DATA;
 			  }
+			  else if (currentItem->rowType[currentItem->cursor] == ITEM_ACTION_TOGGLE) {
+				  LCD_MENU_DataToggle(currentItem->dataElement[currentItem->cursor]);
+				  LCD_MENU_UpdateItemData(currentItem);
+			  }
+
+		  }
+		  else if (ENC_CountChange(&encoder) == TRUE) {
+			  uint8_t direction = ENC_GetDirection(&encoder);
+			  currentItem = LCD_MENU_MoveItemCursor(currentItem, direction);
 		  }
 	  }
 	  else if (state == ST_DATA) {
+		  if (ENC_ReadSwitch(&encoder) == HIGH) {
+			  state = ST_ITEM;
+		  }
 
+		  else if (ENC_CountChange(&encoder) == TRUE) {
+			  LCD_MENU_DataIncrement(currentItem->dataElement[currentItem->cursor], ENC_GetDirection(&encoder));
+			  LCD_MENU_UpdateItemData(currentItem);
+		  }
 	  }
+
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, dataItems[3].value);
 
 	  dataItems[0].value = MAX_GetCelcius(&hmax1);
 
@@ -328,7 +382,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;

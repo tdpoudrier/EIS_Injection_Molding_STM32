@@ -18,17 +18,19 @@ void MAX_Init (MAX31855_HandleTypeDef *hmax,SPI_HandleTypeDef *hspi, uint16_t cs
 
 }
 
-int MAX_GetCelcius (MAX31855_HandleTypeDef * maxPtr) {
+int16_t MAX_GetCelcius (MAX31855_HandleTypeDef * maxPtr) {
+
+	uint8_t spi_buf[4] = {0};
 
 	HAL_StatusTypeDef status = HAL_OK;
-	uint8_t spi_buf[4] = {0};
 
 	HAL_GPIO_WritePin(maxPtr->csPort, maxPtr->csPin, GPIO_PIN_RESET);
 	status = HAL_SPI_Receive(maxPtr->hspi, (uint8_t *) spi_buf, 4, 100);
-	if (status != HAL_OK) {
-		while (1);
-	}
 	HAL_GPIO_WritePin(maxPtr->csPort, maxPtr->csPin, GPIO_PIN_SET);
+
+	if (status != HAL_OK) {
+		while(1);
+	}
 
 	//Assemble data into one int variable
 	uint32_t data = 0x00000000;
@@ -40,7 +42,7 @@ int MAX_GetCelcius (MAX31855_HandleTypeDef * maxPtr) {
 	//Convert binary data to celcius
 	float celcius = (data >> 18) * 0.25;
 
-	return (int) (celcius * 100);
+	return (int16_t) (celcius);
 }
 
 //Read 32 bits from MAX3166

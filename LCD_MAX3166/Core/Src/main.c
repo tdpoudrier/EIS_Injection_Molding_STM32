@@ -113,7 +113,7 @@ int main(void)
 	 * CLK is PB3/D3
 	 * CS is PB5/D6
 	 */
-	MAX_Init(&max31855, &hspi1, GPIO_PIN_5, GPIOB);
+	MAX_Init(&max31855, &hspi1, GPIO_PIN_15, GPIOA);
 	LCD_Init(&hlcd, &hi2c1, LCD_ADDRESS);
 
 	uart_buf_len = sprintf(uart_buf, "LCD MAX31866 Test\r\n");
