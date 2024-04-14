@@ -92,8 +92,8 @@ char * hometxt[4] =
 {
 		"Set temp",
 		"Current temp 1",
-		"Current temp 2",
-		"Process Name"
+		"Speed",
+		"Heating"
 };
 
 char * debugTxt[4] =
@@ -109,7 +109,7 @@ char * temperatureTxt[4] =
 		"^..",
 		"Set Temp 1",
 		"Heating",
-		""
+		"Speed"
 };
 
 
@@ -157,6 +157,8 @@ int main(void)
   ENC_Init(&encoder, &htim3, GPIOA, GPIO_PIN_9);
   LCD_Init(&hlcd, &hi2c1, LCD_ADDRESS);
   MAX_Init(&hmax1, &hspi1, GPIO_PIN_15, GPIOA);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
 
   //Create main menu
   LCD_MENU_ListInit(&hlcd, &menuLists[0]);
@@ -167,8 +169,11 @@ int main(void)
   LCD_MENU_ItemInit(&hlcd, &menuItems[0], "Home", hometxt, ITEM_TYPE_DISPLAY);
   LCD_MENU_DataInit(&dataItems[4], &hlcd); // set temp
   LCD_MENU_DataInit(&dataItems[0], &hlcd);
+  LCD_MENU_DataInit(&dataItems[5], &hlcd); // heating on/off
   LCD_MENU_ItemAddData(&menuItems[0], &dataItems[0], 1, ITEM_ACTION_DATA); // current temp 1
   LCD_MENU_ItemAddData(&menuItems[0], &dataItems[4], 0,  ITEM_ACTION_DATA); // set temp
+  LCD_MENU_ItemAddData(&menuItems[0], &dataItems[6], 2, ITEM_ACTION_DATA); // heating speed
+  LCD_MENU_ItemAddData(&menuItems[0], &dataItems[5], 3, ITEM_ACTION_TOGGLE); // heating on/off
 
   //Create debug item
   LCD_MENU_ItemInit(&hlcd, &menuItems[1], "Debug", debugTxt, ITEM_TYPE_CONFIG);
@@ -182,16 +187,16 @@ int main(void)
 
   //Create Temperature item
   LCD_MENU_ItemInit(&hlcd, &menuItems[2], "Temperature", temperatureTxt, ITEM_TYPE_CONFIG);
-  LCD_MENU_DataInit(&dataItems[5], &hlcd); // heating on/off
+  LCD_MENU_DataInit(&dataItems[6], &hlcd); // heating speed
   LCD_MENU_ItemAddData(&menuItems[2], &dataItems[4], 1, ITEM_ACTION_DATA); //set temp
   LCD_MENU_ItemAddData(&menuItems[2], &dataItems[5], 2, ITEM_ACTION_TOGGLE); // heating on/off
+  LCD_MENU_ItemAddData(&menuItems[2], &dataItems[6], 3, ITEM_ACTION_DATA); // heating speed
   LCD_MENU_ItemSetAction(&menuItems[2], 0, ITEM_ACTION_RETURN);
 
   LCD_MENU_AddItemToList(&menuLists[0], &menuItems[0]);
   LCD_MENU_AddItemToList(&menuLists[0], &menuItems[1]);
   LCD_MENU_AddItemToList(&menuLists[0], &menuItems[2]);
 
-//HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   sprintf( (char*) MSG, "EIS Injection Molding %d\n\r", MAX_GetCelcius(&hmax1));
   HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
 
@@ -204,6 +209,7 @@ int main(void)
   LCD_MENU_PrintList (headList);
 
   dataItems[4].value = 50; //set temp to 50
+  dataItems[6].value = 200; // heat bands duty cycle 0-255
 
   /* USER CODE END 2 */
 
@@ -262,9 +268,37 @@ int main(void)
 		  }
 	  }
 
+	  dataItems[0].value = MAX_GetCelcius(&hmax1);
+
+	  //Heating
+	  if (dataItems[5].value == HIGH) {
+		  //turn on heat bands if below set temp
+		  if (dataItems[4].value > dataItems[0].value) { //if set temp is greater than current temp
+			  //TIM1->CCR2 = (uint8_t) dataItems[6].value;
+			  TIM1->CCR1 = (uint8_t) dataItems[6].value;
+
+		  }
+		  else {
+			  //turn off heat bands
+			  TIM1->CCR2 = 0;
+			  TIM1->CCR1 = 0;
+			  dataItems[5].value = LOW;
+		  }
+	  }
+	  else {
+		  //turn off heat bands
+		  TIM1->CCR2 = 0;
+		  TIM1->CCR1 = 0;
+	  }
+
+	  //Status LED
 	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, dataItems[3].value);
 
-	  dataItems[0].value = MAX_GetCelcius(&hmax1);
+	  //Hopper Door
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, dataItems[2].value);
+
+	  //Piston
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, dataItems[1].value);
 
 	  HAL_Delay(10);
 
@@ -421,10 +455,10 @@ static void MX_TIM1_Init(void)
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 0;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 65535;
+  htim1.Init.Period = 255;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
-  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
   {
     Error_Handler();
@@ -578,10 +612,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(Led_GPIO_Port, Led_Pin, GPIO_PIN_SET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, SOLENOID_1_Pin|SOLENOID_2_Pin|SPI_CS_2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LED_Pin|SOLENOID_1_Pin|SOLENOID_2_Pin|SPI_CS_2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SPI_CS_1_GPIO_Port, SPI_CS_1_Pin, GPIO_PIN_RESET);
@@ -592,15 +623,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(User_Button_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : Led_Pin */
-  GPIO_InitStruct.Pin = Led_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-  HAL_GPIO_Init(Led_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : SOLENOID_1_Pin SOLENOID_2_Pin SPI_CS_2_Pin */
-  GPIO_InitStruct.Pin = SOLENOID_1_Pin|SOLENOID_2_Pin|SPI_CS_2_Pin;
+  /*Configure GPIO pins : LED_Pin SOLENOID_1_Pin SOLENOID_2_Pin SPI_CS_2_Pin */
+  GPIO_InitStruct.Pin = LED_Pin|SOLENOID_1_Pin|SOLENOID_2_Pin|SPI_CS_2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
