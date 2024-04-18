@@ -83,16 +83,29 @@ static void MX_USART2_UART_Init(void);
 volatile uint32_t counter = 0;
 uint32_t prevCount;
 
-//Allocate menu elements
-LCD_MENU_List menuLists[3];
-LCD_MENU_Item menuItems[10];
-LCD_MENU_Data dataItems[10];
+//Create main menu
+LCD_MENU_List mainMenu;
+
+//Create menu items
+LCD_MENU_Item homeDisplay;
+LCD_MENU_Item debugMenu;
+LCD_MENU_Item temperatureMenu;
+
+//Create data elements for menu
+LCD_MENU_Data setTemp;
+LCD_MENU_Data barrelTemp;
+LCD_MENU_Data nozzleTemp;
+LCD_MENU_Data heatEnable;
+LCD_MENU_Data pistonEnable;
+LCD_MENU_Data doorEnable;
+LCD_MENU_Data ledEnable;
+LCD_MENU_Data heatingSpeed;
 
 char * hometxt[4] =
 {
 		"Set temp",
-		"Current temp 1",
-		"Speed",
+		"Nozzle temp",
+		"Barrel temp",
 		"Heating"
 };
 
@@ -157,59 +170,66 @@ int main(void)
   ENC_Init(&encoder, &htim3, GPIOA, GPIO_PIN_9);
   LCD_Init(&hlcd, &hi2c1, LCD_ADDRESS);
   MAX_Init(&hmax1, &hspi1, GPIO_PIN_15, GPIOA);
+  MAX_Init(&hmax2, &hspi1, GPIO_PIN_5, GPIOB);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
 
-  //Create main menu
-  LCD_MENU_ListInit(&hlcd, &menuLists[0]);
-  LCD_MENU_ListInit(&hlcd, &menuLists[1]);
-  LCD_MENU_ExtendList(&menuLists[0], &menuLists[1]);
+  //Initalize Menu Lists
+  LCD_MENU_ListInit(&hlcd, &mainMenu);
 
-  //Create menu item
-  LCD_MENU_ItemInit(&hlcd, &menuItems[0], "Home", hometxt, ITEM_TYPE_DISPLAY);
-  LCD_MENU_DataInit(&dataItems[4], &hlcd); // set temp
-  LCD_MENU_DataInit(&dataItems[0], &hlcd);
-  LCD_MENU_DataInit(&dataItems[5], &hlcd); // heating on/off
-  LCD_MENU_ItemAddData(&menuItems[0], &dataItems[0], 1, ITEM_ACTION_DATA); // current temp 1
-  LCD_MENU_ItemAddData(&menuItems[0], &dataItems[4], 0,  ITEM_ACTION_DATA); // set temp
-  LCD_MENU_ItemAddData(&menuItems[0], &dataItems[6], 2, ITEM_ACTION_DATA); // heating speed
-  LCD_MENU_ItemAddData(&menuItems[0], &dataItems[5], 3, ITEM_ACTION_TOGGLE); // heating on/off
+  //Initialize Data Elements
+  LCD_MENU_DataInit(&setTemp, &hlcd); // set temp
+  LCD_MENU_DataInit(&nozzleTemp, &hlcd); // current temp 1
+  LCD_MENU_DataInit(&barrelTemp, &hlcd); // current temp 2
+  LCD_MENU_DataInit(&heatEnable, &hlcd); // heating on/off
+  LCD_MENU_DataInit(&pistonEnable, &hlcd); // piston
+  LCD_MENU_DataInit(&doorEnable, &hlcd); // h door
+  LCD_MENU_DataInit(&ledEnable, &hlcd); // led
 
-  //Create debug item
-  LCD_MENU_ItemInit(&hlcd, &menuItems[1], "Debug", debugTxt, ITEM_TYPE_CONFIG);
-  LCD_MENU_DataInit(&dataItems[1], &hlcd); // piston
-  LCD_MENU_DataInit(&dataItems[2], &hlcd); // h door
-  LCD_MENU_DataInit(&dataItems[3], &hlcd); // led
-  LCD_MENU_ItemAddData(&menuItems[1], &dataItems[1], 1, ITEM_ACTION_TOGGLE);
-  LCD_MENU_ItemAddData(&menuItems[1], &dataItems[2], 2, ITEM_ACTION_TOGGLE);
-  LCD_MENU_ItemAddData(&menuItems[1], &dataItems[3], 3, ITEM_ACTION_TOGGLE);
-  LCD_MENU_ItemSetAction(&menuItems[1], 0, ITEM_ACTION_RETURN);
 
-  //Create Temperature item
-  LCD_MENU_ItemInit(&hlcd, &menuItems[2], "Temperature", temperatureTxt, ITEM_TYPE_CONFIG);
-  LCD_MENU_DataInit(&dataItems[6], &hlcd); // heating speed
-  LCD_MENU_ItemAddData(&menuItems[2], &dataItems[4], 1, ITEM_ACTION_DATA); //set temp
-  LCD_MENU_ItemAddData(&menuItems[2], &dataItems[5], 2, ITEM_ACTION_TOGGLE); // heating on/off
-  LCD_MENU_ItemAddData(&menuItems[2], &dataItems[6], 3, ITEM_ACTION_DATA); // heating speed
-  LCD_MENU_ItemSetAction(&menuItems[2], 0, ITEM_ACTION_RETURN);
+  //Initialize Menu Items
+  LCD_MENU_ItemInit(&hlcd, &homeDisplay, "Home", hometxt, ITEM_TYPE_DISPLAY);
+  LCD_MENU_ItemInit(&hlcd, &debugMenu, "Debug", debugTxt, ITEM_TYPE_CONFIG);
+  LCD_MENU_ItemInit(&hlcd, &temperatureMenu, "Temperature", temperatureTxt, ITEM_TYPE_CONFIG);
 
-  LCD_MENU_AddItemToList(&menuLists[0], &menuItems[0]);
-  LCD_MENU_AddItemToList(&menuLists[0], &menuItems[1]);
-  LCD_MENU_AddItemToList(&menuLists[0], &menuItems[2]);
+
+  //Add data to Home Display
+  LCD_MENU_ItemAddData(&homeDisplay, &setTemp, 0,  ITEM_ACTION_DATA); // set temp
+  LCD_MENU_ItemAddData(&homeDisplay, &nozzleTemp, 1, ITEM_ACTION_DATA); // current temp 1
+  LCD_MENU_ItemAddData(&homeDisplay, &barrelTemp, 2, ITEM_ACTION_DATA); // current temp 2
+  LCD_MENU_ItemAddData(&homeDisplay, &heatEnable, 3, ITEM_ACTION_TOGGLE); // heating on/off
+
+
+  //Add data items to Debug menu
+  LCD_MENU_ItemAddData(&debugMenu, &pistonEnable, 1, ITEM_ACTION_TOGGLE);
+  LCD_MENU_ItemAddData(&debugMenu, &doorEnable, 2, ITEM_ACTION_TOGGLE);
+  LCD_MENU_ItemAddData(&debugMenu, &ledEnable, 3, ITEM_ACTION_TOGGLE);
+  LCD_MENU_ItemSetAction(&debugMenu, 0, ITEM_ACTION_RETURN); //return to main menu
+
+  //Add data items to temperature menu
+  LCD_MENU_ItemAddData(&temperatureMenu, &setTemp, 1, ITEM_ACTION_DATA); //set temp
+  LCD_MENU_ItemAddData(&temperatureMenu, &heatEnable, 2, ITEM_ACTION_TOGGLE); // heating on/off
+  LCD_MENU_ItemAddData(&temperatureMenu, &heatingSpeed, 3, ITEM_ACTION_DATA); // heating speed
+  LCD_MENU_ItemSetAction(&temperatureMenu, 0, ITEM_ACTION_RETURN);
+
+  //Add menu items to main menu
+  LCD_MENU_AddItemToList(&mainMenu, &homeDisplay);
+  LCD_MENU_AddItemToList(&mainMenu, &debugMenu);
+  LCD_MENU_AddItemToList(&mainMenu, &temperatureMenu);
 
   sprintf( (char*) MSG, "EIS Injection Molding %d\n\r", MAX_GetCelcius(&hmax1));
   HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
 
   uint8_t state = ST_MENU;
 
-  LCD_MENU_List* headList = &menuLists[0];
+  LCD_MENU_List* headList = &mainMenu;
   LCD_MENU_List* currentList = headList;
   LCD_MENU_Item* currentItem = NULL;
 
   LCD_MENU_PrintList (headList);
 
-  dataItems[4].value = 50; //set temp to 50
-  dataItems[6].value = 200; // heat bands duty cycle 0-255
+  setTemp.value = 218; //set temp to 5
+  heatingSpeed.value = 210; // heat bands duty cycle 0-255
 
   /* USER CODE END 2 */
 
@@ -217,6 +237,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  //Navigate main menu
 	  if (state == ST_MENU) {
 		  if (ENC_ReadSwitch(&encoder) == HIGH) {
 			  state = ST_ITEM;
@@ -228,61 +249,83 @@ int main(void)
 			  currentList = LCD_MENU_MoveListCursor(currentList, direction);
 		  }
 	  }
+	  //Navigate menu item
 	  else if (state == ST_ITEM) {
 		  if (currentItem->type == ITEM_TYPE_DISPLAY) {
 			  LCD_MENU_UpdateItemData(currentItem);
 		  }
 
 		  if (ENC_ReadSwitch(&encoder) == HIGH) {
+			  //Return to main menu
 			  if (currentItem->type == ITEM_TYPE_DISPLAY) {
 
 				  state = ST_MENU;
 				  LCD_MENU_PrintList (currentList);
 			  }
+			  //return to main menu
 			  else if (currentItem->rowType[currentItem->cursor] == ITEM_ACTION_RETURN) {
 				  state = ST_MENU;
 				  LCD_MENU_PrintList (currentList);
 			  }
+			  //Edit data
 			  else if (currentItem->rowType[currentItem->cursor] == ITEM_ACTION_DATA) {
 				  state = ST_DATA;
 			  }
+			  //Toggle data
 			  else if (currentItem->rowType[currentItem->cursor] == ITEM_ACTION_TOGGLE) {
 				  LCD_MENU_DataToggle(currentItem->dataElement[currentItem->cursor]);
 				  LCD_MENU_UpdateItemData(currentItem);
 			  }
 
 		  }
+		  //Move cursor
 		  else if (ENC_CountChange(&encoder) == TRUE) {
 			  uint8_t direction = ENC_GetDirection(&encoder);
 			  currentItem = LCD_MENU_MoveItemCursor(currentItem, direction);
 		  }
 	  }
+	  //Editing Data
 	  else if (state == ST_DATA) {
+		  //Return to menu item
 		  if (ENC_ReadSwitch(&encoder) == HIGH) {
 			  state = ST_ITEM;
 		  }
-
+		  //Increment data based on encoder direction
 		  else if (ENC_CountChange(&encoder) == TRUE) {
 			  LCD_MENU_DataIncrement(currentItem->dataElement[currentItem->cursor], ENC_GetDirection(&encoder));
 			  LCD_MENU_UpdateItemData(currentItem);
 		  }
 	  }
+	  else if (state == ST_INJECT) {
+		  //preheat
 
-	  dataItems[0].value = MAX_GetCelcius(&hmax1);
+		  //Insert Plastic
+
+		  //wait for plastic to be melted based on calculations
+
+		  //Inject Plastic
+
+		  //Injection Complete
+
+	  }
+
+	  nozzleTemp.value = MAX_GetCelcius(&hmax1);
+	  barrelTemp.value = MAX_GetCelcius(&hmax2);
 
 	  //Heating
-	  if (dataItems[5].value == HIGH) {
+	  if (heatEnable.value == HIGH) {
 		  //turn on heat bands if below set temp
-		  if (dataItems[4].value > dataItems[0].value) { //if set temp is greater than current temp
-			  //TIM1->CCR2 = (uint8_t) dataItems[6].value;
-			  TIM1->CCR1 = (uint8_t) dataItems[6].value;
+		  if (nozzleTemp.value < setTemp.value) {
+			  TIM1->CCR1 = (uint8_t) heatingSpeed.value;
 
+		  }
+		  if (barrelTemp.value < setTemp.value) {
+			  TIM1->CCR2 = (uint8_t) heatingSpeed.value;
 		  }
 		  else {
 			  //turn off heat bands
 			  TIM1->CCR2 = 0;
 			  TIM1->CCR1 = 0;
-			  dataItems[5].value = LOW;
 		  }
 	  }
 	  else {
@@ -292,13 +335,13 @@ int main(void)
 	  }
 
 	  //Status LED
-	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, dataItems[3].value);
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, ledEnable.value);
 
 	  //Hopper Door
-	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, dataItems[2].value);
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, doorEnable.value);
 
 	  //Piston
-	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, dataItems[1].value);
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, pistonEnable.value);
 
 	  HAL_Delay(10);
 

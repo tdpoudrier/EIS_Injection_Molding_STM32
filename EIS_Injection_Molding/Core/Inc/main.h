@@ -49,6 +49,7 @@ extern "C" {
 #define ST_MENU 0
 #define ST_ITEM 1
 #define ST_DATA 2
+#define ST_INJECT 3
 
 #define TRUE 1
 #define FALSE 0
