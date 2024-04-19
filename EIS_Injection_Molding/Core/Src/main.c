@@ -27,11 +27,19 @@
 #include "LCD_Menu.h"
 #include "LCD_Menu_Data.h"
 #include "MAX31855.h"
+#include <string.h>
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+
+typedef struct __plastic {
+	char name[21]; //name can only be 20 characters long, extra byte for null character
+	uint16_t nozzleTemp;
+	uint16_t barrelTemp;
+	uint32_t heatingTime; //heating time in ms
+} Plastic_Type;
 
 /* USER CODE END PTD */
 
@@ -81,7 +89,8 @@ static void MX_USART2_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 volatile uint32_t counter = 0;
-uint32_t prevCount;
+uint32_t prevCountPrintDebug;
+uint32_t prevCountInjectTime;
 
 //Create main menu
 LCD_MENU_List mainMenu;
@@ -90,6 +99,8 @@ LCD_MENU_List mainMenu;
 LCD_MENU_Item homeDisplay;
 LCD_MENU_Item debugMenu;
 LCD_MENU_Item temperatureMenu;
+LCD_MENU_Item injectControlMenu;
+LCD_MENU_Item cancelInjectionMenu;
 
 //Create data elements for menu
 LCD_MENU_Data setTemp;
@@ -100,6 +111,11 @@ LCD_MENU_Data pistonEnable;
 LCD_MENU_Data doorEnable;
 LCD_MENU_Data ledEnable;
 LCD_MENU_Data heatingSpeed;
+LCD_MENU_Data injectionEnable;
+
+//Create plastic types
+Plastic_Type plastics [5];
+Plastic_Type * testPlastic = &plastics[0];
 
 char * hometxt[4] =
 {
@@ -123,6 +139,22 @@ char * temperatureTxt[4] =
 		"Set Temp 1",
 		"Heating",
 		"Speed"
+};
+
+char * injectSelectionTxt[4] =
+{
+		"^..",
+		"testPlastic1",
+		"testPlastic2",
+		"testPlastic3"
+};
+
+char * cancelInjectionTxt[4] =
+{
+		"Cancel Injection?",
+		"Yes",
+		"No",
+		""
 };
 
 
@@ -153,7 +185,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-  //SysTick_Config(SystemCoreClock / 1000); //set to 1ms per tick
+  SysTick_Config(SystemCoreClock / 1000); //set to 1ms per tick
 
   /* USER CODE END SysInit */
 
@@ -165,6 +197,12 @@ int main(void)
   MX_TIM3_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+
+  //Define Plastics
+  testPlastic->nozzleTemp = 220;
+  testPlastic->barrelTemp = 210;
+  testPlastic->heatingTime = 10000; // heatTime in ms
+  strcpy(testPlastic->name, "testPlastic1");
 
   //Initalize peripherials
   ENC_Init(&encoder, &htim3, GPIOA, GPIO_PIN_9);
@@ -185,12 +223,15 @@ int main(void)
   LCD_MENU_DataInit(&pistonEnable, &hlcd); // piston
   LCD_MENU_DataInit(&doorEnable, &hlcd); // h door
   LCD_MENU_DataInit(&ledEnable, &hlcd); // led
+  LCD_MENU_DataInit(&injectionEnable, &hlcd);
 
 
   //Initialize Menu Items
   LCD_MENU_ItemInit(&hlcd, &homeDisplay, "Home", hometxt, ITEM_TYPE_DISPLAY);
   LCD_MENU_ItemInit(&hlcd, &debugMenu, "Debug", debugTxt, ITEM_TYPE_CONFIG);
   LCD_MENU_ItemInit(&hlcd, &temperatureMenu, "Temperature", temperatureTxt, ITEM_TYPE_CONFIG);
+  LCD_MENU_ItemInit(&hlcd, &injectControlMenu, "Start Injection", injectSelectionTxt, ITEM_TYPE_CONFIG);
+  LCD_MENU_ItemInit(&hlcd, &cancelInjectionMenu, "CancelInjection", cancelInjectionTxt, ITEM_TYPE_CONFIG);
 
 
   //Add data to Home Display
@@ -212,19 +253,31 @@ int main(void)
   LCD_MENU_ItemAddData(&temperatureMenu, &heatingSpeed, 3, ITEM_ACTION_DATA); // heating speed
   LCD_MENU_ItemSetAction(&temperatureMenu, 0, ITEM_ACTION_RETURN);
 
+  //Add data items to injection
+  LCD_MENU_ItemSetAction(&injectControlMenu, 0, ITEM_ACTION_RETURN);
+  LCD_MENU_ItemSetAction(&injectControlMenu, 1, ITEM_ACTION_SELECT);
+
+  //Add actions to cancel menu
+  LCD_MENU_ItemSetAction(&cancelInjectionMenu, 1, ITEM_ACTION_SELECT);
+  LCD_MENU_ItemSetAction(&cancelInjectionMenu, 2, ITEM_ACTION_SELECT);
+
   //Add menu items to main menu
   LCD_MENU_AddItemToList(&mainMenu, &homeDisplay);
+  LCD_MENU_AddItemToList(&mainMenu, &injectControlMenu);
   LCD_MENU_AddItemToList(&mainMenu, &debugMenu);
   LCD_MENU_AddItemToList(&mainMenu, &temperatureMenu);
 
   sprintf( (char*) MSG, "EIS Injection Molding %d\n\r", MAX_GetCelcius(&hmax1));
-  HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
+  HAL_UART_Transmit(&huart2, MSG, strlen( (char*) MSG), 100);
 
-  uint8_t state = ST_MENU;
+  uint8_t menuState = ST_MENU;
+  uint8_t injectState = ST_STANDBY;
+  uint8_t cancelRequest = LOW;
 
   LCD_MENU_List* headList = &mainMenu;
   LCD_MENU_List* currentList = headList;
-  LCD_MENU_Item* currentItem = NULL;
+  LCD_MENU_Item* currentItem = &homeDisplay;
+  Plastic_Type* currentPlastic = testPlastic;
 
   LCD_MENU_PrintList (headList);
 
@@ -238,9 +291,9 @@ int main(void)
   while (1)
   {
 	  //Navigate main menu
-	  if (state == ST_MENU) {
+	  if (menuState == ST_MENU) {
 		  if (ENC_ReadSwitch(&encoder) == HIGH) {
-			  state = ST_ITEM;
+			  menuState = ST_ITEM;
 			  currentItem = currentList->items[currentList->cursor];
 			  LCD_MENU_PrintItem(currentItem);
 		  }
@@ -250,7 +303,7 @@ int main(void)
 		  }
 	  }
 	  //Navigate menu item
-	  else if (state == ST_ITEM) {
+	  else if (menuState == ST_ITEM) {
 		  if (currentItem->type == ITEM_TYPE_DISPLAY) {
 			  LCD_MENU_UpdateItemData(currentItem);
 		  }
@@ -259,22 +312,30 @@ int main(void)
 			  //Return to main menu
 			  if (currentItem->type == ITEM_TYPE_DISPLAY) {
 
-				  state = ST_MENU;
+				  menuState = ST_MENU;
 				  LCD_MENU_PrintList (currentList);
 			  }
 			  //return to main menu
 			  else if (currentItem->rowType[currentItem->cursor] == ITEM_ACTION_RETURN) {
-				  state = ST_MENU;
+				  menuState = ST_MENU;
 				  LCD_MENU_PrintList (currentList);
 			  }
 			  //Edit data
 			  else if (currentItem->rowType[currentItem->cursor] == ITEM_ACTION_DATA) {
-				  state = ST_DATA;
+				  menuState = ST_DATA;
 			  }
 			  //Toggle data
 			  else if (currentItem->rowType[currentItem->cursor] == ITEM_ACTION_TOGGLE) {
 				  LCD_MENU_DataToggle(currentItem->dataElement[currentItem->cursor]);
 				  LCD_MENU_UpdateItemData(currentItem);
+			  }
+			  //Select injection profile
+			  else if (currentItem->rowType[currentItem->cursor] == ITEM_ACTION_SELECT) {
+				  currentPlastic = &plastics[currentItem->cursor - 1];
+				  menuState = ST_INJECT;
+				  injectState = ST_HEAT;
+				  currentItem = &homeDisplay;
+				  LCD_MENU_PrintItem(&homeDisplay);
 			  }
 
 		  }
@@ -285,10 +346,10 @@ int main(void)
 		  }
 	  }
 	  //Editing Data
-	  else if (state == ST_DATA) {
+	  else if (menuState == ST_DATA) {
 		  //Return to menu item
 		  if (ENC_ReadSwitch(&encoder) == HIGH) {
-			  state = ST_ITEM;
+			  menuState = ST_ITEM;
 		  }
 		  //Increment data based on encoder direction
 		  else if (ENC_CountChange(&encoder) == TRUE) {
@@ -296,43 +357,143 @@ int main(void)
 			  LCD_MENU_UpdateItemData(currentItem);
 		  }
 	  }
-	  else if (state == ST_INJECT) {
-		  //preheat
 
-		  //Insert Plastic
+	  /**
+	   * Injection Process active
+	   * Lock display on home info screen
+	   * User can cancel procces by pressing encoder button and confirming
+	   */
+	  else if (menuState == ST_INJECT) {
+		  //update display
+		  LCD_MENU_UpdateItemData(currentItem);
+		  uint8_t switchValue = ENC_ReadSwitch(&encoder);
 
-		  //wait for plastic to be melted based on calculations
+		  //Request to cancel injection
+		  if (switchValue && cancelRequest == LOW) {
+			  cancelRequest = HIGH;
+			  currentItem = &cancelInjectionMenu;
+			  LCD_MENU_PrintItem(currentItem);
+		  }
+		  //Select Yes or no to cancel injection
+		  else if (switchValue && cancelRequest == HIGH) {
+			  //cancel
+			  if (currentItem->cursor == 1) {
+				  cancelRequest = LOW;
+				  menuState = ST_MENU;
+				  injectState = ST_STANDBY;
+				  LCD_MENU_PrintList(headList);
+			  }
+			  //do not cancel
+			  else if (currentItem->cursor == 2) {
+				  cancelRequest = LOW;
+				  currentItem = &homeDisplay;
+				  LCD_MENU_PrintItem(currentItem);
+			  }
 
-		  //Inject Plastic
-
-		  //Injection Complete
-
+		  }
+		  //Navigate cancelation menu
+		  else if (cancelRequest == HIGH) {
+			  if (ENC_CountChange(&encoder) == TRUE) {
+				  uint8_t direction = ENC_GetDirection(&encoder);
+				  currentItem = LCD_MENU_MoveItemCursor(currentItem, direction);
+			  }
+		  }
 	  }
 
-	  nozzleTemp.value = MAX_GetCelcius(&hmax1);
-	  barrelTemp.value = MAX_GetCelcius(&hmax2);
+	  //Injection Process Control
+	  switch (injectState) {
+	  //wating to inject
+	  case ST_STANDBY:
+		  injectionEnable.value = LOW;
+		  break;
 
-	  //Heating
-	  if (heatEnable.value == HIGH) {
-		  //turn on heat bands if below set temp
-		  if (nozzleTemp.value < setTemp.value) {
-			  TIM1->CCR1 = (uint8_t) heatingSpeed.value;
+	  //heating
+	//TODO move heating control to outside of state machines so heating occurs during multiple injection states
+	  case ST_HEAT:
+		  heatEnable.value = HIGH;
+		  //heat nozzle
+		  if (nozzleTemp.value < currentPlastic->nozzleTemp) {
+//			  TIM1->CCR1 = (uint8_t) heatingSpeed.value;
+			  nozzleTemp.value++;
+		  }
+		  //heat barrel
+		  if (barrelTemp.value < currentPlastic->barrelTemp) {
+//			  TIM1->CCR2 = (uint8_t) heatingSpeed.value;
+			  barrelTemp.value++;
+		  }
+		  //heating complete
+		  if (nozzleTemp.value >= currentPlastic->nozzleTemp && barrelTemp.value >= currentPlastic->barrelTemp) {
+			  injectState = ST_INSERT;
+			  prevCountInjectTime = counter;
 
+			  //turn off heat bands
+			  TIM1->CCR2 = 0;
+			  TIM1->CCR1 = 0;
 		  }
-		  if (barrelTemp.value < setTemp.value) {
-			  TIM1->CCR2 = (uint8_t) heatingSpeed.value;
-		  }
+
 		  else {
 			  //turn off heat bands
 			  TIM1->CCR2 = 0;
 			  TIM1->CCR1 = 0;
 		  }
+		  break;
+
+	  //insert plastc, hold door open for 10 seconds
+	  case ST_INSERT:
+		  doorEnable.value = HIGH;
+		  if (counter - prevCountInjectTime > 10000) {
+			  injectState = ST_MELTING;
+			  prevCountInjectTime = counter;
+			  doorEnable.value = LOW;
+		  }
+
+		  break;
+
+	  //melting plastic
+	  case ST_MELTING:
+		  if (counter - prevCountInjectTime > currentPlastic->heatingTime) {
+			  injectState = ST_INJECT_PLASTIC;
+			  prevCountInjectTime = counter;
+		  }
+		  break;
+
+	  //inject plastic
+	  case ST_INJECT_PLASTIC:
+		  pistonEnable.value = HIGH;
+		  if (counter - prevCountInjectTime > 10000) {
+			  injectState = ST_STANDBY;
+			  menuState = ST_ITEM;
+			  prevCountInjectTime = counter;
+			  pistonEnable.value = LOW;
+		  }
+		  break;
+
 	  }
-	  else {
-		  //turn off heat bands
-		  TIM1->CCR2 = 0;
-		  TIM1->CCR1 = 0;
-	  }
+
+//	  nozzleTemp.value = MAX_GetCelcius(&hmax1);
+//	  barrelTemp.value = MAX_GetCelcius(&hmax2);
+
+	  //Heating
+//	  if (heatEnable.value == HIGH) {
+//		  //turn on heat bands if below set temp
+//		  if (nozzleTemp.value < setTemp.value) {
+//			  TIM1->CCR1 = (uint8_t) heatingSpeed.value;
+//
+//		  }
+//		  if (barrelTemp.value < setTemp.value) {
+//			  TIM1->CCR2 = (uint8_t) heatingSpeed.value;
+//		  }
+//		  else {
+//			  //turn off heat bands
+//			  TIM1->CCR2 = 0;
+//			  TIM1->CCR1 = 0;
+//		  }
+//	  }
+//	  else {
+//		  //turn off heat bands
+//		  TIM1->CCR2 = 0;
+//		  TIM1->CCR1 = 0;
+//	  }
 
 	  //Status LED
 	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, ledEnable.value);
@@ -344,6 +505,31 @@ int main(void)
 	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, pistonEnable.value);
 
 	  HAL_Delay(10);
+
+	  if (counter - prevCountPrintDebug > 1000) {
+		  if (heatEnable.value == HIGH) {
+			  if (currentPlastic->nozzleTemp > nozzleTemp.value) {
+				  nozzleTemp.value++;
+			  }
+			  if (currentPlastic->barrelTemp > barrelTemp.value) {
+				  barrelTemp.value++;
+			  }
+		  }
+
+		  sprintf( (char*) MSG, "----Application state: %d----\r\n", menuState);
+		  HAL_UART_Transmit(&huart2, MSG, strlen( (char*) MSG), 100);
+
+		  sprintf( (char*) MSG, "Injection state: %d\r\n", injectState);
+		  HAL_UART_Transmit(&huart2, MSG, strlen( (char*) MSG), 100);
+
+		  sprintf( (char*) MSG, "LED: %d, Door: %d, Piston: %d\r\n", ledEnable.value, doorEnable.value, pistonEnable.value);
+		  HAL_UART_Transmit(&huart2, MSG, strlen( (char*) MSG), 100);
+
+		  sprintf( (char*) MSG, "HeatEN: %d, nozzle: %d, barrel: %d, heatSpeed: %d\r\n\n", heatEnable.value, nozzleTemp.value, barrelTemp.value, heatingSpeed.value);
+		  HAL_UART_Transmit(&huart2, MSG, strlen( (char*) MSG), 100);
+		  prevCountPrintDebug = counter;
+	  }
+
 
     /* USER CODE END WHILE */
 

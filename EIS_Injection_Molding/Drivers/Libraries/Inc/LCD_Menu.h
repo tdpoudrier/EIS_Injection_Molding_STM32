@@ -24,6 +24,7 @@
 #define ITEM_ACTION_DATA 1
 #define ITEM_ACTION_RETURN 2
 #define ITEM_ACTION_TOGGLE 3
+#define ITEM_ACTION_SELECT 4
 
 typedef struct __LCD_MENU_Item {
 	LCD_HandleTypeDef* hlcd;

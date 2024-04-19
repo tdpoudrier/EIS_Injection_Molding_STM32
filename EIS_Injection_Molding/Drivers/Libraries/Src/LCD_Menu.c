@@ -202,7 +202,7 @@ LCD_MENU_Item* LCD_MENU_MoveItemCursor (LCD_MENU_Item* item, uint8_t direction) 
  * Define the action of a menu item row
  */
 void LCD_MENU_ItemSetAction (LCD_MENU_Item* item, uint8_t index, uint8_t action) {
-	if (action > 2 || index > 3) {
+	if (action > 4 || index > 3) {
 		return;
 	}
 

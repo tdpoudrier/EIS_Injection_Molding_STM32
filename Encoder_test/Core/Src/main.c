@@ -72,7 +72,7 @@ static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN 0 */
 
 volatile uint32_t counter;
-uint32_t prevCount;
+uint32_t prevCountPrintDebug;
 
 /* USER CODE END 0 */
 
@@ -128,11 +128,11 @@ int main(void)
   while (1)
   {
 	  encoder_count = ENC_GetCount(&encoder);
-	  if (ENC_ReadSwitch(&encoder) && counter - prevCount > 10) {
+	  if (ENC_ReadSwitch(&encoder) && counter - prevCountPrintDebug > 10) {
 		  button_count++;
 		  sprintf( (char*) MSG, "Button Pressed: %d, dir:%d\n\r          ", button_count, encoder_count);
 		  HAL_UART_Transmit(&huart2, MSG, sizeof(MSG), 100);
-		  prevCount = counter;
+		  prevCountPrintDebug = counter;
 
 	  }
 
