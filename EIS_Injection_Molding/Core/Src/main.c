@@ -467,7 +467,7 @@ int main(void)
 	  //inject plastic
 	  case ST_INJECT_PLASTIC:
 		  pistonEnable.value = HIGH;
-		  if (counter - prevCountInjectTime > 10000) {
+		  if (counter - prevCountInjectTime > 30000) {
 			  injectState = ST_STANDBY;
 			  menuState = ST_ITEM;
 			  prevCountInjectTime = counter;
@@ -518,7 +518,8 @@ int main(void)
 
 	  //Status LED
 	  if (injectState != ST_STANDBY) {
-		  if (counter - prevCountLED > 1000) {
+		  //blink LED during injection process
+		  if (counter - prevCountLED > 500) {
 			  //toggle LED
 			  ledEnable.value = !ledEnable.value & 0x1;
 			  prevCountLED = counter;
