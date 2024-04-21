@@ -83,6 +83,7 @@ static void MX_TIM1_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
+uint16_t getTemperature (MAX31855_HandleTypeDef* thermocouple, uint16_t tempBuffer[], uint8_t * count, uint8_t size);
 
 /* USER CODE END PFP */
 
@@ -91,6 +92,7 @@ static void MX_USART2_UART_Init(void);
 volatile uint32_t counter = 0;
 uint32_t prevCountPrintDebug;
 uint32_t prevCountInjectTime;
+uint32_t prevCountLED;
 
 //Create main menu
 LCD_MENU_List mainMenu;
@@ -103,7 +105,8 @@ LCD_MENU_Item injectControlMenu;
 LCD_MENU_Item cancelInjectionMenu;
 
 //Create data elements for menu
-LCD_MENU_Data setTemp;
+LCD_MENU_Data setNozzleTemp;
+LCD_MENU_Data setBarrelTemp;
 LCD_MENU_Data barrelTemp;
 LCD_MENU_Data nozzleTemp;
 LCD_MENU_Data heatEnable;
@@ -170,6 +173,14 @@ int main(void)
   /* USER CODE BEGIN 1 */
 	uint8_t MSG[100] = {'\0'};
 
+	uint8_t thermoBufferSize = 10;
+	uint16_t thermo1Buffer[10] = {0};
+	uint8_t thermo1BufferCount = 0;
+
+	uint16_t thermo2Buffer[10] = {0};
+	uint8_t thermo2BufferCount = 0;
+
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -201,7 +212,7 @@ int main(void)
   //Define Plastics
   testPlastic->nozzleTemp = 220;
   testPlastic->barrelTemp = 210;
-  testPlastic->heatingTime = 10000; // heatTime in ms
+  testPlastic->heatingTime = 1200000; // heatTime in ms
   strcpy(testPlastic->name, "testPlastic1");
 
   //Initalize peripherials
@@ -216,7 +227,8 @@ int main(void)
   LCD_MENU_ListInit(&hlcd, &mainMenu);
 
   //Initialize Data Elements
-  LCD_MENU_DataInit(&setTemp, &hlcd); // set temp
+  LCD_MENU_DataInit(&setNozzleTemp, &hlcd); // set temp
+  LCD_MENU_DataInit(&setBarrelTemp, &hlcd);
   LCD_MENU_DataInit(&nozzleTemp, &hlcd); // current temp 1
   LCD_MENU_DataInit(&barrelTemp, &hlcd); // current temp 2
   LCD_MENU_DataInit(&heatEnable, &hlcd); // heating on/off
@@ -235,7 +247,7 @@ int main(void)
 
 
   //Add data to Home Display
-  LCD_MENU_ItemAddData(&homeDisplay, &setTemp, 0,  ITEM_ACTION_DATA); // set temp
+  LCD_MENU_ItemAddData(&homeDisplay, &setNozzleTemp, 0,  ITEM_ACTION_DATA); // set temp
   LCD_MENU_ItemAddData(&homeDisplay, &nozzleTemp, 1, ITEM_ACTION_DATA); // current temp 1
   LCD_MENU_ItemAddData(&homeDisplay, &barrelTemp, 2, ITEM_ACTION_DATA); // current temp 2
   LCD_MENU_ItemAddData(&homeDisplay, &heatEnable, 3, ITEM_ACTION_TOGGLE); // heating on/off
@@ -248,7 +260,7 @@ int main(void)
   LCD_MENU_ItemSetAction(&debugMenu, 0, ITEM_ACTION_RETURN); //return to main menu
 
   //Add data items to temperature menu
-  LCD_MENU_ItemAddData(&temperatureMenu, &setTemp, 1, ITEM_ACTION_DATA); //set temp
+  LCD_MENU_ItemAddData(&temperatureMenu, &setNozzleTemp, 1, ITEM_ACTION_DATA); //set temp
   LCD_MENU_ItemAddData(&temperatureMenu, &heatEnable, 2, ITEM_ACTION_TOGGLE); // heating on/off
   LCD_MENU_ItemAddData(&temperatureMenu, &heatingSpeed, 3, ITEM_ACTION_DATA); // heating speed
   LCD_MENU_ItemSetAction(&temperatureMenu, 0, ITEM_ACTION_RETURN);
@@ -281,7 +293,9 @@ int main(void)
 
   LCD_MENU_PrintList (headList);
 
-  setTemp.value = 218; //set temp to 5
+  //set default temperatures
+  setNozzleTemp.value = 220; //set temp to 5
+  setBarrelTemp.value = 210;
   heatingSpeed.value = 210; // heat bands duty cycle 0-255
 
   /* USER CODE END 2 */
@@ -405,22 +419,15 @@ int main(void)
 	  //wating to inject
 	  case ST_STANDBY:
 		  injectionEnable.value = LOW;
+		  prevCountInjectTime = counter;
 		  break;
 
 	  //heating
-	//TODO move heating control to outside of state machines so heating occurs during multiple injection states
 	  case ST_HEAT:
+		  setNozzleTemp.value = currentPlastic->nozzleTemp;
+		  setBarrelTemp.value = currentPlastic->barrelTemp;
 		  heatEnable.value = HIGH;
-		  //heat nozzle
-		  if (nozzleTemp.value < currentPlastic->nozzleTemp) {
-//			  TIM1->CCR1 = (uint8_t) heatingSpeed.value;
-			  nozzleTemp.value++;
-		  }
-		  //heat barrel
-		  if (barrelTemp.value < currentPlastic->barrelTemp) {
-//			  TIM1->CCR2 = (uint8_t) heatingSpeed.value;
-			  barrelTemp.value++;
-		  }
+
 		  //heating complete
 		  if (nozzleTemp.value >= currentPlastic->nozzleTemp && barrelTemp.value >= currentPlastic->barrelTemp) {
 			  injectState = ST_INSERT;
@@ -465,47 +472,76 @@ int main(void)
 			  menuState = ST_ITEM;
 			  prevCountInjectTime = counter;
 			  pistonEnable.value = LOW;
+			  heatEnable.value = LOW;
 		  }
 		  break;
 
 	  }
 
-//	  nozzleTemp.value = MAX_GetCelcius(&hmax1);
-//	  barrelTemp.value = MAX_GetCelcius(&hmax2);
+	  nozzleTemp.value = getTemperature(&hmax1, thermo1Buffer, &thermo1BufferCount, thermoBufferSize);
+	  barrelTemp.value = getTemperature(&hmax2, thermo2Buffer, &thermo2BufferCount, thermoBufferSize);
 
 	  //Heating
-//	  if (heatEnable.value == HIGH) {
-//		  //turn on heat bands if below set temp
-//		  if (nozzleTemp.value < setTemp.value) {
-//			  TIM1->CCR1 = (uint8_t) heatingSpeed.value;
-//
-//		  }
-//		  if (barrelTemp.value < setTemp.value) {
-//			  TIM1->CCR2 = (uint8_t) heatingSpeed.value;
-//		  }
-//		  else {
-//			  //turn off heat bands
-//			  TIM1->CCR2 = 0;
-//			  TIM1->CCR1 = 0;
-//		  }
-//	  }
-//	  else {
-//		  //turn off heat bands
-//		  TIM1->CCR2 = 0;
-//		  TIM1->CCR1 = 0;
-//	  }
+	  if (heatEnable.value == HIGH) {
+		  //turn on nozzle heat bands if below set temp
+		  if (nozzleTemp.value < setNozzleTemp.value) {
+			  TIM1->CCR1 = (uint8_t) heatingSpeed.value;
+
+		  }
+		  else {
+			  //turn off heat bands
+			  TIM1->CCR1 = 0;
+			  if (injectState == ST_STANDBY) {
+				  heatEnable.value = LOW;
+			  }
+		  }
+
+		  //turn on barrel heat bands if below set temp
+		  if (barrelTemp.value < setBarrelTemp.value) {
+			  TIM1->CCR2 = (uint8_t) heatingSpeed.value;
+		  }
+		  else {
+			  //turn off heat bands
+			  TIM1->CCR2 = 0;
+
+			  if (injectState == ST_STANDBY) {
+				  heatEnable.value = LOW;
+			  }
+
+		  }
+	  }
+	  else {
+		  //turn off heat bands
+		  TIM1->CCR2 = 0;
+		  TIM1->CCR1 = 0;
+	  }
 
 	  //Status LED
+	  if (injectState != ST_STANDBY) {
+		  if (counter - prevCountLED > 1000) {
+			  //toggle LED
+			  ledEnable.value = !ledEnable.value & 0x1;
+			  prevCountLED = counter;
+		  }
+	  }
+	  else {
+		  if (nozzleTemp.value > 40 || barrelTemp.value > 40) {
+			  ledEnable.value = HIGH;
+		  }
+		  else {
+			  ledEnable.value = LOW;
+		  }
+	  }
+
+
+	  //Update GPIO values;
 	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, ledEnable.value);
-
-	  //Hopper Door
 	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, doorEnable.value);
-
-	  //Piston
 	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, pistonEnable.value);
 
 	  HAL_Delay(10);
 
+	  //Print debug messages to com port
 	  if (counter - prevCountPrintDebug > 1000) {
 		  if (heatEnable.value == HIGH) {
 			  if (currentPlastic->nozzleTemp > nozzleTemp.value) {
@@ -525,7 +561,13 @@ int main(void)
 		  sprintf( (char*) MSG, "LED: %d, Door: %d, Piston: %d\r\n", ledEnable.value, doorEnable.value, pistonEnable.value);
 		  HAL_UART_Transmit(&huart2, MSG, strlen( (char*) MSG), 100);
 
-		  sprintf( (char*) MSG, "HeatEN: %d, nozzle: %d, barrel: %d, heatSpeed: %d\r\n\n", heatEnable.value, nozzleTemp.value, barrelTemp.value, heatingSpeed.value);
+		  sprintf( (char*) MSG, "HeatEN: %d, nozzle: %d, barrel: %d, heatSpeed: %d\r\n", heatEnable.value, nozzleTemp.value, barrelTemp.value, heatingSpeed.value);
+		  HAL_UART_Transmit(&huart2, MSG, strlen( (char*) MSG), 100);
+
+		  sprintf( (char*) MSG, "Set temps, nozzle: %d, barrel: %d\r\n", currentPlastic->nozzleTemp, currentPlastic->barrelTemp);
+		  HAL_UART_Transmit(&huart2, MSG, strlen( (char*) MSG), 100);
+
+		  sprintf( (char*) MSG, "Count-prevInjectCount: %lu, wait time: %lu\r\n\n", counter - prevCountInjectTime, currentPlastic->heatingTime );
 		  HAL_UART_Transmit(&huart2, MSG, strlen( (char*) MSG), 100);
 		  prevCountPrintDebug = counter;
 	  }
@@ -881,6 +923,26 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+//Ring buffer implementation
+uint16_t getTemperature (MAX31855_HandleTypeDef* thermocouple, uint16_t tempBuffer[], uint8_t * count, uint8_t size)
+{
+
+	//Get measurement
+	tempBuffer[*count] = MAX_GetCelcius(thermocouple);
+	*count = (*count + 1) % size;
+
+	//Calculate total
+	uint32_t total = 0;
+    for (uint8_t i = 0; i < size; i++)
+    {
+	    total += tempBuffer[i];
+    }
+
+    //Calculate and return average
+    uint16_t average = total / size;
+    return average;
+}
 
 /* USER CODE END 4 */
 
