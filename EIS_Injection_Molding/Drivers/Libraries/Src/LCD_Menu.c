@@ -269,3 +269,7 @@ void LCD_MENU_UpdateItemData(LCD_MENU_Item* item) {
 	}
 }
 
+void LCD_MENU_ItemSetString (LCD_MENU_Item* item, uint8_t row, char* string) {
+	strncpy(item->rowText[row], string, 21);
+}
+

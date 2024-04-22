@@ -33,7 +33,9 @@ typedef struct __LCD_MENU_Item {
 	uint8_t type;
 	int8_t cursor;
 	uint8_t rowType[4];
-	LCD_MENU_Data* dataElement[4];
+	uint8_t dataElementRowPos[10];
+	uint8_t dataElementColPos[10];
+	LCD_MENU_Data* dataElement[10];
 	struct __LCD_MENU_Item* parent;
 	struct __LCD_MENU_Item* child;
 } LCD_MENU_Item;
@@ -76,5 +78,7 @@ void LCD_MENU_ItemSetAction (LCD_MENU_Item* item, uint8_t index, uint8_t action)
 void LCD_MENU_PrintItem (LCD_MENU_Item* list);
 
 void LCD_MENU_UpdateItemData(LCD_MENU_Item* item);
+
+void LCD_MENU_ItemSetString (LCD_MENU_Item* item, uint8_t row, char* string);
 
 #endif /* INC_LCD_MENU_H_ */

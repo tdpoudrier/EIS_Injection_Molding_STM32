@@ -16,6 +16,11 @@ void LCD_MENU_DataInit (LCD_MENU_Data* dataItem, LCD_HandleTypeDef* hlcd, uint8_
 	dataItem->value = 0;
 }
 
+void LCD_MENU_DataSetCursor (LCD_MENU_Data* dataItem, uint8_t lcd_row, uint8_t lcd_col) {
+	dataItem->rowPos = lcd_row;
+	dataItem->colPos = lcd_col;
+}
+
 void LCD_MENU_DataIncrement (LCD_MENU_Data* dataItem, uint8_t direction) {
 	if (direction == 1) {
 		dataItem->value++;

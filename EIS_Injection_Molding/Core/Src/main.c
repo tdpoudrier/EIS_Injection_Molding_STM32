@@ -84,6 +84,7 @@ static void MX_TIM3_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 uint16_t getTemperature (MAX31855_HandleTypeDef* thermocouple, uint16_t tempBuffer[], uint8_t * count, uint8_t size);
+void printHomeDisplay ();
 
 /* USER CODE END PFP */
 
@@ -96,6 +97,7 @@ uint32_t prevCountLED;
 
 //Create main menu
 LCD_MENU_List mainMenu;
+LCD_MENU_List mainMenu2;
 
 //Create menu items
 LCD_MENU_Item homeDisplay;
@@ -103,6 +105,7 @@ LCD_MENU_Item debugMenu;
 LCD_MENU_Item temperatureMenu;
 LCD_MENU_Item injectControlMenu;
 LCD_MENU_Item cancelInjectionMenu;
+LCD_MENU_Item creditsMenu;
 
 //Create data elements for menu
 LCD_MENU_Data setNozzleTemp;
@@ -118,7 +121,7 @@ LCD_MENU_Data injectionEnable;
 
 //Create plastic types
 Plastic_Type plastics [5];
-Plastic_Type * testPlastic = &plastics[0];
+Plastic_Type * plastic_HDPE = &plastics[0];
 
 char * hometxt[4] =
 {
@@ -147,9 +150,6 @@ char * temperatureTxt[4] =
 char * injectSelectionTxt[4] =
 {
 		"^..",
-		"testPlastic1",
-		"testPlastic2",
-		"testPlastic3"
 };
 
 char * cancelInjectionTxt[4] =
@@ -158,6 +158,14 @@ char * cancelInjectionTxt[4] =
 		"Yes",
 		"No",
 		""
+};
+
+char * credits[4] =
+{
+		"Tevin Poudrier",
+		"Jonah Shadley",
+		"Colson Miller",
+		"Josiah Mart"
 };
 
 
@@ -210,10 +218,10 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   //Define Plastics
-  testPlastic->nozzleTemp = 220;
-  testPlastic->barrelTemp = 210;
-  testPlastic->heatingTime = 1200000; // heatTime in ms
-  strcpy(testPlastic->name, "testPlastic1");
+  plastic_HDPE->nozzleTemp = 220;
+  plastic_HDPE->barrelTemp = 210;
+  plastic_HDPE->heatingTime = 1200000; // heatTime in ms
+  strcpy(plastic_HDPE->name, "HDPE");
 
   //Initalize peripherials
   ENC_Init(&encoder, &htim3, GPIOA, GPIO_PIN_9);
@@ -225,6 +233,8 @@ int main(void)
 
   //Initalize Menu Lists
   LCD_MENU_ListInit(&hlcd, &mainMenu);
+  LCD_MENU_ListInit(&hlcd, &mainMenu2);
+  LCD_MENU_ExtendList(&mainMenu, &mainMenu2);
 
   //Initialize Data Elements
   LCD_MENU_DataInit(&setNozzleTemp, &hlcd); // set temp
@@ -244,6 +254,7 @@ int main(void)
   LCD_MENU_ItemInit(&hlcd, &temperatureMenu, "Temperature", temperatureTxt, ITEM_TYPE_CONFIG);
   LCD_MENU_ItemInit(&hlcd, &injectControlMenu, "Start Injection", injectSelectionTxt, ITEM_TYPE_CONFIG);
   LCD_MENU_ItemInit(&hlcd, &cancelInjectionMenu, "CancelInjection", cancelInjectionTxt, ITEM_TYPE_CONFIG);
+  LCD_MENU_ItemInit(&hlcd, &creditsMenu, "Credits", credits, ITEM_TYPE_DISPLAY);
 
 
   //Add data to Home Display
@@ -265,9 +276,12 @@ int main(void)
   LCD_MENU_ItemAddData(&temperatureMenu, &heatingSpeed, 3, ITEM_ACTION_DATA); // heating speed
   LCD_MENU_ItemSetAction(&temperatureMenu, 0, ITEM_ACTION_RETURN);
 
-  //Add data items to injection
+  //Add data items to injection menu
   LCD_MENU_ItemSetAction(&injectControlMenu, 0, ITEM_ACTION_RETURN);
   LCD_MENU_ItemSetAction(&injectControlMenu, 1, ITEM_ACTION_SELECT);
+
+  //Add plastics to injection memu
+  LCD_MENU_ItemSetString(&injectControlMenu, 1, plastic_HDPE->name);
 
   //Add actions to cancel menu
   LCD_MENU_ItemSetAction(&cancelInjectionMenu, 1, ITEM_ACTION_SELECT);
@@ -278,6 +292,7 @@ int main(void)
   LCD_MENU_AddItemToList(&mainMenu, &injectControlMenu);
   LCD_MENU_AddItemToList(&mainMenu, &debugMenu);
   LCD_MENU_AddItemToList(&mainMenu, &temperatureMenu);
+  LCD_MENU_AddItemToList(&mainMenu2, &creditsMenu);
 
   sprintf( (char*) MSG, "EIS Injection Molding %d\n\r", MAX_GetCelcius(&hmax1));
   HAL_UART_Transmit(&huart2, MSG, strlen( (char*) MSG), 100);
@@ -289,7 +304,7 @@ int main(void)
   LCD_MENU_List* headList = &mainMenu;
   LCD_MENU_List* currentList = headList;
   LCD_MENU_Item* currentItem = &homeDisplay;
-  Plastic_Type* currentPlastic = testPlastic;
+  Plastic_Type* currentPlastic = plastic_HDPE;
 
   LCD_MENU_PrintList (headList);
 
@@ -944,6 +959,20 @@ uint16_t getTemperature (MAX31855_HandleTypeDef* thermocouple, uint16_t tempBuff
     uint16_t average = total / size;
     return average;
 }
+
+//void printHomeDisplay () {
+//	char string[21] = {0};
+//
+//	//print nozzle data
+//	LCD_SetCursor(&hlcd, 0, 0);
+//	snprintf(string, 21, "Nozzle: %d/%d", setNozzleTemp.value, nozzleTemp.value);
+//	LCD_Print(&hlcd, string);
+//
+//	//print barrel data
+//	LCD_SetCursor(&hlcd, 0, 1);
+//	snprintf(string, 21, "Barrel: %d/%d", setBarrelTemp.value, barrelTemp.value);
+//	LCD_Print(&hlcd, string);
+//}
 
 /* USER CODE END 4 */
 
