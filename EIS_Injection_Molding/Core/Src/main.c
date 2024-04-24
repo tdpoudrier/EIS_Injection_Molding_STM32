@@ -84,7 +84,7 @@ static void MX_TIM3_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 uint16_t getTemperature (MAX31855_HandleTypeDef* thermocouple, uint16_t tempBuffer[], uint8_t * count, uint8_t size);
-void printHomeDisplay ();
+void printHomeDisplay (uint8_t injectState, Plastic_Type* plastic);
 
 /* USER CODE END PFP */
 
@@ -122,51 +122,7 @@ LCD_MENU_Data injectionEnable;
 //Create plastic types
 Plastic_Type plastics [5];
 Plastic_Type * plastic_HDPE = &plastics[0];
-
-char * hometxt[4] =
-{
-		"Set temp",
-		"Nozzle temp",
-		"Barrel temp",
-		"Heating"
-};
-
-char * debugTxt[4] =
-{
-		"^..",
-		"Piston",
-		"H Door",
-		"LED"
-};
-
-char * temperatureTxt[4] =
-{
-		"^..",
-		"Set Temp 1",
-		"Heating",
-		"Speed"
-};
-
-char * injectSelectionTxt[4] =
-{
-		"^..",
-};
-
-char * cancelInjectionTxt[4] =
-{
-		"Cancel Injection?",
-		"Yes",
-		"No",
-		""
-};
-
-char * credits[4] =
-{
-		"Tevin Poudrier",
-		"Jonah Shadley",
-		"Colson Miller",
-		"Josiah Mart"
-};
+Plastic_Type* plastic_PP = &plastics[1];
 
 
 /* USER CODE END 0 */
@@ -187,6 +143,54 @@ int main(void)
 
 	uint16_t thermo2Buffer[10] = {0};
 	uint8_t thermo2BufferCount = 0;
+
+	char * hometxt[4] =
+	{
+			"Set temp            ",
+			"Nozzle temp         ",
+			"Barrel temp         ",
+			"Heating             "
+	};
+
+	char * debugTxt[4] =
+	{
+			"^..",
+			"Piston",
+			"H Door",
+			"LED"
+	};
+
+	char * temperatureTxt[4] =
+	{
+			"^..",
+			"Set Temp 1",
+			"Heating",
+			"Speed"
+	};
+
+	char * injectSelectionTxt[4] =
+	{
+			"^..",
+			"HDPE",
+			"PP",
+			""
+	};
+
+	char * cancelInjectionTxt[4] =
+	{
+			"Cancel Injection?",
+			"Yes",
+			"No",
+			""
+	};
+
+	char * credits[4] =
+	{
+			"Tevin Poudrier",
+			"Jonah Shadley",
+			"Colson Miller",
+			"Josiah Mart"
+	};
 
 
   /* USER CODE END 1 */
@@ -222,6 +226,11 @@ int main(void)
   plastic_HDPE->barrelTemp = 210;
   plastic_HDPE->heatingTime = 1200000; // heatTime in ms
   strcpy(plastic_HDPE->name, "HDPE");
+
+  plastic_PP->nozzleTemp = 245;
+  plastic_PP->barrelTemp = 238;
+  plastic_PP->heatingTime = 1200000; // heatTime in ms
+  strcpy(plastic_HDPE->name, "PP");
 
   //Initalize peripherials
   ENC_Init(&encoder, &htim3, GPIOA, GPIO_PIN_9);
@@ -279,9 +288,11 @@ int main(void)
   //Add data items to injection menu
   LCD_MENU_ItemSetAction(&injectControlMenu, 0, ITEM_ACTION_RETURN);
   LCD_MENU_ItemSetAction(&injectControlMenu, 1, ITEM_ACTION_SELECT);
+  LCD_MENU_ItemSetAction(&injectControlMenu, 2, ITEM_ACTION_SELECT);
 
   //Add plastics to injection memu
   LCD_MENU_ItemSetString(&injectControlMenu, 1, plastic_HDPE->name);
+  LCD_MENU_ItemSetString(&injectControlMenu, 2, plastic_PP->name);
 
   //Add actions to cancel menu
   LCD_MENU_ItemSetAction(&cancelInjectionMenu, 1, ITEM_ACTION_SELECT);
@@ -482,7 +493,7 @@ int main(void)
 	  //inject plastic
 	  case ST_INJECT_PLASTIC:
 		  pistonEnable.value = HIGH;
-		  if (counter - prevCountInjectTime > 30000) {
+		  if (counter - prevCountInjectTime > 60000) {
 			  injectState = ST_STANDBY;
 			  menuState = ST_ITEM;
 			  prevCountInjectTime = counter;
@@ -525,6 +536,8 @@ int main(void)
 
 		  }
 	  }
+
+
 	  else {
 		  //turn off heat bands
 		  TIM1->CCR2 = 0;
@@ -960,19 +973,35 @@ uint16_t getTemperature (MAX31855_HandleTypeDef* thermocouple, uint16_t tempBuff
     return average;
 }
 
-//void printHomeDisplay () {
-//	char string[21] = {0};
-//
-//	//print nozzle data
-//	LCD_SetCursor(&hlcd, 0, 0);
-//	snprintf(string, 21, "Nozzle: %d/%d", setNozzleTemp.value, nozzleTemp.value);
-//	LCD_Print(&hlcd, string);
-//
-//	//print barrel data
-//	LCD_SetCursor(&hlcd, 0, 1);
-//	snprintf(string, 21, "Barrel: %d/%d", setBarrelTemp.value, barrelTemp.value);
-//	LCD_Print(&hlcd, string);
-//}
+void printHomeDisplay (uint8_t injectState, Plastic_Type* plastic) {
+	LCD_Clear(&hlcd);
+	char string[21] = {0};
+
+	//print nozzle data
+	LCD_SetCursor(&hlcd, 0, 0);
+	snprintf(string, 21, "Nozzle: %d/%d", setNozzleTemp.value, nozzleTemp.value);
+	LCD_Print(&hlcd, string);
+
+	//print barrel data
+	LCD_SetCursor(&hlcd, 0, 1);
+	snprintf(string, 21, "Barrel: %d/%d", setBarrelTemp.value, barrelTemp.value);
+	LCD_Print(&hlcd, string);
+
+	if (injectState != ST_STANDBY) {
+		LCD_SetCursor(&hlcd, 0, 2);
+		snprintf(string, 21, "%s", plastic->name);
+		LCD_Print(&hlcd, string);
+
+		LCD_SetCursor(&hlcd, 0, 3);
+		snprintf(string, 21, "Progress: %lu", (counter - prevCountInjectTime) / plastic->heatingTime);
+		LCD_Print(&hlcd, string);
+	}
+	else {
+		LCD_SetCursor(&hlcd, 0, 3);
+		snprintf(string, 21, "Standby");
+		LCD_Print(&hlcd, string);
+	}
+}
 
 /* USER CODE END 4 */
 
