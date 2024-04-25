@@ -47,6 +47,26 @@ extern "C" {
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
 
+//menu states
+#define ST_MENU 0
+#define ST_ITEM 1
+#define ST_DATA 2
+#define ST_INJECT 3
+#define ST_CANCEL 4
+
+//injection states
+#define ST_STANDBY 0
+#define ST_INSERT 1
+#define ST_HEAT 2
+#define ST_MELTING 3
+#define ST_INJECT_PLASTIC 4
+
+#define TRUE 1
+#define FALSE 0
+#define HIGH 1
+#define LOW 0
+
+
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
