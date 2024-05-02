@@ -163,20 +163,8 @@ LCD_MENU_Item* LCD_MENU_MoveItemCursor (LCD_MENU_Item* item, uint8_t direction) 
 		item->cursor--;
 	}
 
-	//List cursor has past the end of list, go to child list
-	if(item->cursor > 3) {
-		if(item->child != NULL) {
-			item->cursor--;
-			LCD_MENU_PrintItem(item->child);
-
-			return item->child;
-		}
-		else {
-			item->cursor--;
-		}
-	}
-	//List cursor has past the start of list, go to parent list
-	else if(item->cursor < 0) {
+	//Item cursor has past the start of list, go to parent list
+	if(item->cursor < 0) {
 		if(item->parent != NULL) {
 			item->cursor = 0;
 			LCD_MENU_PrintItem(item->parent);
@@ -185,6 +173,18 @@ LCD_MENU_Item* LCD_MENU_MoveItemCursor (LCD_MENU_Item* item, uint8_t direction) 
 		}
 		else {
 			item->cursor++;
+		}
+	}
+	//Item cursor has past the end of list, go to child list
+	else if(item->cursor > 3) {
+		if(item->child != NULL) {
+			item->cursor--;
+			LCD_MENU_PrintItem(item->child);
+
+			return item->child;
+		}
+		else {
+			item->cursor--;
 		}
 	}
 
@@ -269,7 +269,7 @@ void LCD_MENU_UpdateItemData(LCD_MENU_Item* item) {
 	}
 }
 
-void LCD_MENU_ItemSetString (LCD_MENU_Item* item, uint8_t row, char* string) {
-	strncpy(item->rowText[row], string, 21);
+void LCD_MENU_ItemSetString (LCD_MENU_Item* item, uint8_t row, char * string) {
+	item->rowText[row] = string;
 }
 

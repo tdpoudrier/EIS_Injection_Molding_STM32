@@ -51,7 +51,7 @@ HAL_StatusTypeDef LCD_Init (LCD_HandleTypeDef *hlcd, I2C_HandleTypeDef *hi2c, ui
 	status += LCD_WriteCommand(hlcd, 0x06);
 
 	//Turn display on and blink cursor
-	status += LCD_WriteCommand(hlcd, 0x0f);
+	status += LCD_WriteCommand(hlcd, 0x0C);
 
 	return status;
 }

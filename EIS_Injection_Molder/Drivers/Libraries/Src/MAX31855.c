@@ -40,7 +40,8 @@ int16_t MAX_GetCelcius (MAX31855_HandleTypeDef * maxPtr) {
 	}
 
 	//Convert binary data to celcius
-	float celcius = (data >> 18) * 0.25;
+	uint32_t tempBitData = (data >> 18);
+	float celcius = tempBitData * 0.25;
 
 	return (int16_t) (celcius);
 }

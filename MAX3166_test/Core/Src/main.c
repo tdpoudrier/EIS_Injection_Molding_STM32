@@ -23,7 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include "MAX31855.h"
-#include "LCD_I2C.h"
+#include <string.h>
 
 /* USER CODE END Includes */
 
@@ -53,8 +53,6 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 MAX31855_HandleTypeDef max31855;
-
-LCD_HandleTypeDef hlcd;
 
 /* USER CODE END PV */
 
@@ -116,18 +114,15 @@ int main(void)
   /*
    * MISO is PB4/D5
    * CLK is PB3/D3
-   * CS is PB5/D6
+   * CS is PA15/D7
    */
   MAX_Init(&max31855, &hspi1, GPIO_PIN_15, GPIOA);
-
-  LCD_Init(&hlcd, &hi2c1, 0x20);
 
   //Say something
   uart_buf_len = sprintf(uart_buf, "SPI Test\r\n");
   HAL_UART_Transmit(&huart2, (uint8_t *) uart_buf, uart_buf_len, 100);
 
   uint16_t celcius = 0;
-  uint8_t heating = 1;
 
   /* USER CODE END 2 */
 
@@ -137,28 +132,10 @@ int main(void)
   {
 	  celcius = MAX_GetCelcius(&max31855);
 
-	  uart_buf_len = sprintf(uart_buf, "Temp in C: %d                          \r\n", celcius);
-	  HAL_UART_Transmit(&huart2, (uint8_t *) uart_buf, uart_buf_len, 100);
+	  sprintf(uart_buf, "Temp in C: %d, SPI error:%lu\r\n", celcius, HAL_SPI_GetError(&hspi1));
+	  HAL_UART_Transmit(&huart2, (uint8_t *) uart_buf, strlen(uart_buf), 100);
 
-	  LCD_Print(&hlcd, uart_buf);
-
-	  //turn on heat bands if below set temp
-	  if (celcius < 50 && heating == 1) { //if set temp is greater than current temp
-		  //TIM1->CCR2 = (uint8_t) dataItems[6].value;
-		  //TIM1->CCR1 = 255;
-
-	  }
-	  else {
-		  //turn off heat bands
-		  TIM1->CCR1 = 0;
-		  heating = 0;
-	  }
-
-	  uart_buf_len = sprintf(uart_buf, "Temp in C: %d      PWN DC %lu", celcius, TIM1->CCR1);
-	  LCD_SetCursor(&hlcd, 0, 0);
-	  LCD_Print(&hlcd, uart_buf);
-
-	  HAL_Delay(100);
+	  HAL_Delay(1000);
 
     /* USER CODE END WHILE */
 

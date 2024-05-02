@@ -22,9 +22,15 @@ int16_t MAX_GetCelcius (MAX31855_HandleTypeDef * maxPtr) {
 
 	uint8_t spi_buf[4] = {0};
 
+	HAL_StatusTypeDef status = HAL_OK;
+
 	HAL_GPIO_WritePin(maxPtr->csPort, maxPtr->csPin, GPIO_PIN_RESET);
-	HAL_StatusTypeDef status = HAL_SPI_Receive(maxPtr->hspi, (uint8_t *) spi_buf, 4, 100);
+	status = HAL_SPI_Receive(maxPtr->hspi, (uint8_t *) spi_buf, 4, 100);
 	HAL_GPIO_WritePin(maxPtr->csPort, maxPtr->csPin, GPIO_PIN_SET);
+
+	if (status != HAL_OK) {
+		while(1);
+	}
 
 	//Assemble data into one int variable
 	uint32_t data = 0x00000000;
@@ -34,16 +40,8 @@ int16_t MAX_GetCelcius (MAX31855_HandleTypeDef * maxPtr) {
 	}
 
 	//Convert binary data to celcius
-	float celcius = (data >> 18) * 0.25;
-
-	uint32_t mask = 0x0000fff0;
-	float internalTemp = ((data & mask) >> 4) *0.25;
-
-	uint32_t max_status = (data & 0x0000000F);
-
-	if (max_status != 0) {
-		uint32_t halt = 0;
-	}
+	uint32_t tempBitData = (data >> 18);
+	float celcius = tempBitData * 0.25;
 
 	return (int16_t) (celcius);
 }

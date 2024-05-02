@@ -59,6 +59,7 @@ I2C_HandleTypeDef hi2c1;
 SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart2;
 
@@ -79,9 +80,10 @@ static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 uint16_t getTemperature (MAX31855_HandleTypeDef* thermocouple, uint16_t tempBuffer[], uint8_t * count, uint8_t size);
-void printHomeDisplay (uint8_t injectState, Plastic_Type* plastic);
+void printHomeDisplayData (uint8_t injectState, Plastic_Type* plastic);
 
 /* USER CODE END PFP */
 
@@ -101,8 +103,11 @@ LCD_MENU_Item homeDisplay;
 LCD_MENU_Item debugMenu;
 LCD_MENU_Item temperatureMenu;
 LCD_MENU_Item injectControlMenu;
+LCD_MENU_Item injectControlMenu2;
 LCD_MENU_Item cancelInjectionMenu;
 LCD_MENU_Item creditsMenu;
+LCD_MENU_Item customPlasticMenu;
+LCD_MENU_Item temperatureMenu2;
 
 //Create data elements for menu
 LCD_MENU_Data setNozzleTemp;
@@ -115,11 +120,17 @@ LCD_MENU_Data doorEnable;
 LCD_MENU_Data ledEnable;
 LCD_MENU_Data heatingSpeed;
 LCD_MENU_Data injectionEnable;
+LCD_MENU_Data customSetBarrelTemp;
+LCD_MENU_Data customSetNozzleTemp;
+LCD_MENU_Data customMeltTime;
 
 //Create plastic types
 Plastic_Type plastics [5];
 Plastic_Type * plastic_HDPE = &plastics[0];
 Plastic_Type* plastic_PP = &plastics[1];
+Plastic_Type* plastic_PLA = &plastics[2];
+Plastic_Type* plastic_ABS = &plastics[3];
+Plastic_Type* plastic_custom = &plastics[4];
 
 
 /* USER CODE END 0 */
@@ -142,10 +153,10 @@ int main(void)
 
 	char * hometxt[4] =
 	{
-			"Set temp            ",
-			"Nozzle temp         ",
-			"Barrel temp         ",
-			"Heating             "
+			"Nozzle          /",
+			"Barrel          /",
+			"",
+			""
 	};
 
 	char * debugTxt[4] =
@@ -153,22 +164,38 @@ int main(void)
 			"^..",
 			"Piston",
 			"H Door",
-			"LED"
+			""
 	};
 
 	char * temperatureTxt[4] =
 	{
 			"^..",
-			"Set Temp 1",
-			"Heating",
-			"Speed"
+			"Set Nozzle",
+			"Set Barrel",
+			"Heating"
 	};
 
-	char * injectSelectionTxt[4] =
+	char * temperatureTxt2[4] =
+	{
+			"Speed (0-255)",
+			"",
+			"",
+			""
+	};
+
+	char * injectionSelection1Txt[4] =
 	{
 			"^..",
 			"HDPE",
 			"PP",
+			"PLA"
+	};
+
+	char * injectionSelection2Txt[4] =
+	{
+			"ABS",
+			"Custom",
+			"",
 			""
 	};
 
@@ -178,6 +205,14 @@ int main(void)
 			"Yes",
 			"No",
 			""
+	};
+
+	char * customPlasticTxt[4] =
+	{
+			"^..",
+			"Nozzle:",
+			"Barrel:",
+			"Time (m):"
 	};
 
 	char * credits[4] =
@@ -214,6 +249,7 @@ int main(void)
   MX_I2C1_Init();
   MX_SPI1_Init();
   MX_TIM2_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
   //Define Plastics
@@ -225,15 +261,30 @@ int main(void)
   plastic_PP->nozzleTemp = 245;
   plastic_PP->barrelTemp = 238;
   plastic_PP->heatingTime = 1200000; // heatTime in ms
-  strcpy(plastic_HDPE->name, "PP");
+  strcpy(plastic_PP->name, "PP");
+
+  plastic_PLA->nozzleTemp = 210;
+  plastic_PLA->barrelTemp = 200;
+  plastic_PLA->heatingTime = 1200000; // heatTime in ms
+  strcpy(plastic_PLA->name, "PLA");
+
+  plastic_ABS->nozzleTemp = 230;
+  plastic_ABS->barrelTemp = 220;
+  plastic_ABS->heatingTime = 1200000; // heatTime in ms
+  strcpy(plastic_ABS->name, "ABS");
+
+  plastic_custom->nozzleTemp = 220;
+  plastic_custom->barrelTemp = 210;
+  plastic_custom->heatingTime = 1200000; // heatTime in ms
+  strcpy(plastic_custom->name, "Custom");
 
   //Initalize peripherials
-  ENC_Init(&encoder, &htim3, GPIOA, GPIO_PIN_9);
+  ENC_Init(&encoder,  &htim3, GPIOA, GPIO_PIN_9);
   LCD_Init(&hlcd, &hi2c1, LCD_ADDRESS);
-  MAX_Init(&hmax1, &hspi2, GPIO_PIN_15, GPIOA);
-  MAX_Init(&hmax2, &hspi2, GPIO_PIN_5, GPIOB);
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+  MAX_Init(&hmax1, &hspi1, GPIO_PIN_8, GPIOA);
+  MAX_Init(&hmax2, &hspi1, GPIO_PIN_10, GPIOB);
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
 
   //Initalize Menu Lists
   LCD_MENU_ListInit(&hlcd, &mainMenu);
@@ -250,57 +301,64 @@ int main(void)
   LCD_MENU_DataInit(&doorEnable, &hlcd); // h door
   LCD_MENU_DataInit(&ledEnable, &hlcd); // led
   LCD_MENU_DataInit(&injectionEnable, &hlcd);
+  LCD_MENU_DataInit(&customSetBarrelTemp, &hlcd);
+  LCD_MENU_DataInit(&customSetNozzleTemp, &hlcd);
+  LCD_MENU_DataInit(&customMeltTime, &hlcd);
+  LCD_MENU_DataInit(&heatingSpeed, &hlcd);
 
 
   //Initialize Menu Items
   LCD_MENU_ItemInit(&hlcd, &homeDisplay, "Home", hometxt, ITEM_TYPE_DISPLAY);
   LCD_MENU_ItemInit(&hlcd, &debugMenu, "Debug", debugTxt, ITEM_TYPE_CONFIG);
   LCD_MENU_ItemInit(&hlcd, &temperatureMenu, "Temperature", temperatureTxt, ITEM_TYPE_CONFIG);
-  LCD_MENU_ItemInit(&hlcd, &injectControlMenu, "Start Injection", injectSelectionTxt, ITEM_TYPE_CONFIG);
+  LCD_MENU_ItemInit(&hlcd, &temperatureMenu2, "Temperature", temperatureTxt2, ITEM_TYPE_CONFIG);
+  LCD_MENU_ItemInit(&hlcd, &injectControlMenu, "Start Injection", injectionSelection1Txt, ITEM_TYPE_CONFIG);
+  LCD_MENU_ItemInit(&hlcd, &injectControlMenu2, "Start Injection", injectionSelection2Txt, ITEM_TYPE_CONFIG);
   LCD_MENU_ItemInit(&hlcd, &cancelInjectionMenu, "CancelInjection", cancelInjectionTxt, ITEM_TYPE_CONFIG);
   LCD_MENU_ItemInit(&hlcd, &creditsMenu, "Credits", credits, ITEM_TYPE_DISPLAY);
-
-
-  //Add data to Home Display
-  LCD_MENU_ItemAddData(&homeDisplay, &setNozzleTemp, 0,  ITEM_ACTION_DATA); // set temp
-  LCD_MENU_ItemAddData(&homeDisplay, &nozzleTemp, 1, ITEM_ACTION_DATA); // current temp 1
-  LCD_MENU_ItemAddData(&homeDisplay, &barrelTemp, 2, ITEM_ACTION_DATA); // current temp 2
-  LCD_MENU_ItemAddData(&homeDisplay, &heatEnable, 3, ITEM_ACTION_TOGGLE); // heating on/off
-
+  LCD_MENU_ItemInit(&hlcd, &customPlasticMenu, "Custom Plastic", customPlasticTxt, ITEM_TYPE_CONFIG);
 
   //Add data items to Debug menu
   LCD_MENU_ItemAddData(&debugMenu, &pistonEnable, 1, ITEM_ACTION_TOGGLE);
   LCD_MENU_ItemAddData(&debugMenu, &doorEnable, 2, ITEM_ACTION_TOGGLE);
-  LCD_MENU_ItemAddData(&debugMenu, &ledEnable, 3, ITEM_ACTION_TOGGLE);
   LCD_MENU_ItemSetAction(&debugMenu, 0, ITEM_ACTION_RETURN); //return to main menu
 
   //Add data items to temperature menu
-  LCD_MENU_ItemAddData(&temperatureMenu, &setNozzleTemp, 1, ITEM_ACTION_DATA); //set temp
-  LCD_MENU_ItemAddData(&temperatureMenu, &heatEnable, 2, ITEM_ACTION_TOGGLE); // heating on/off
-  LCD_MENU_ItemAddData(&temperatureMenu, &heatingSpeed, 3, ITEM_ACTION_DATA); // heating speed
+  LCD_MENU_ExtendItem(&temperatureMenu, &temperatureMenu2);
+  LCD_MENU_ItemAddData(&temperatureMenu, &setNozzleTemp, 1, ITEM_ACTION_DATA);
+  LCD_MENU_ItemAddData(&temperatureMenu, &heatEnable, 3, ITEM_ACTION_TOGGLE);
+  LCD_MENU_ItemAddData(&temperatureMenu, &setBarrelTemp, 2, ITEM_ACTION_DATA);
   LCD_MENU_ItemSetAction(&temperatureMenu, 0, ITEM_ACTION_RETURN);
+  LCD_MENU_ItemAddData(&temperatureMenu2, &heatingSpeed, 0, ITEM_ACTION_DATA);
 
   //Add data items to injection menu
+  LCD_MENU_ExtendItem(&injectControlMenu, &injectControlMenu2);
   LCD_MENU_ItemSetAction(&injectControlMenu, 0, ITEM_ACTION_RETURN);
   LCD_MENU_ItemSetAction(&injectControlMenu, 1, ITEM_ACTION_SELECT);
   LCD_MENU_ItemSetAction(&injectControlMenu, 2, ITEM_ACTION_SELECT);
-
-  //Add plastics to injection memu
-  LCD_MENU_ItemSetString(&injectControlMenu, 1, plastic_HDPE->name);
-  LCD_MENU_ItemSetString(&injectControlMenu, 2, plastic_PP->name);
+  LCD_MENU_ItemSetAction(&injectControlMenu, 3, ITEM_ACTION_SELECT);
+  LCD_MENU_ItemSetAction(&injectControlMenu2, 0, ITEM_ACTION_SELECT);
+  LCD_MENU_ItemSetAction(&injectControlMenu2, 1, ITEM_ACTION_SELECT);
 
   //Add actions to cancel menu
   LCD_MENU_ItemSetAction(&cancelInjectionMenu, 1, ITEM_ACTION_SELECT);
   LCD_MENU_ItemSetAction(&cancelInjectionMenu, 2, ITEM_ACTION_SELECT);
 
+  //Add actions to custom plastic menu
+  LCD_MENU_ItemSetAction(&customPlasticMenu, 0, ITEM_ACTION_RETURN);
+  LCD_MENU_ItemAddData(&customPlasticMenu, &customSetNozzleTemp, 1, ITEM_ACTION_DATA); //set temp
+  LCD_MENU_ItemAddData(&customPlasticMenu, &customSetBarrelTemp, 2, ITEM_ACTION_DATA); // heating on/off
+  LCD_MENU_ItemAddData(&customPlasticMenu, &customMeltTime, 3, ITEM_ACTION_DATA); // heating speed
+
   //Add menu items to main menu
   LCD_MENU_AddItemToList(&mainMenu, &homeDisplay);
   LCD_MENU_AddItemToList(&mainMenu, &injectControlMenu);
-  LCD_MENU_AddItemToList(&mainMenu, &debugMenu);
+  LCD_MENU_AddItemToList(&mainMenu, &customPlasticMenu);
   LCD_MENU_AddItemToList(&mainMenu, &temperatureMenu);
+  LCD_MENU_AddItemToList(&mainMenu2, &debugMenu);
   LCD_MENU_AddItemToList(&mainMenu2, &creditsMenu);
 
-  sprintf( (char*) MSG, "EIS Injection Molding %d\n\r", MAX_GetCelcius(&hmax1));
+  sprintf( (char*) MSG, "EIS Injection Molding\n\r");
   HAL_UART_Transmit(&huart2, MSG, strlen( (char*) MSG), 100);
 
   uint8_t menuState = ST_MENU;
@@ -319,12 +377,25 @@ int main(void)
   setBarrelTemp.value = 210;
   heatingSpeed.value = 210; // heat bands duty cycle 0-255
 
+  customSetBarrelTemp.value = 200;
+  customSetNozzleTemp.value = 200;
+  customMeltTime.value = 20;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  //update custom plastic
+	  plastic_custom->barrelTemp = customSetBarrelTemp.value;
+	  plastic_custom ->nozzleTemp = customSetNozzleTemp.value;
+	  plastic_custom->heatingTime = customMeltTime.value * 60 * 1000;
+
+	  if (heatingSpeed.value > 255) {
+		  heatingSpeed.value = 255;
+	  }
+
 	  //Navigate main menu
 	  if (menuState == ST_MENU) {
 		  if (ENC_ReadSwitch(&encoder) == HIGH) {
@@ -339,7 +410,10 @@ int main(void)
 	  }
 	  //Navigate menu item
 	  else if (menuState == ST_ITEM) {
-		  if (currentItem->type == ITEM_TYPE_DISPLAY) {
+		  if (currentItem == &homeDisplay) {
+			  printHomeDisplayData(injectState, currentPlastic);
+		  }
+		  else if (currentItem->type == ITEM_TYPE_DISPLAY) {
 			  LCD_MENU_UpdateItemData(currentItem);
 		  }
 
@@ -366,7 +440,16 @@ int main(void)
 			  }
 			  //Select injection profile
 			  else if (currentItem->rowType[currentItem->cursor] == ITEM_ACTION_SELECT) {
-				  currentPlastic = &plastics[currentItem->cursor - 1];
+				  if(currentItem == &injectControlMenu) {
+					  currentPlastic = &plastics[currentItem->cursor - 1];
+				  }
+				  else {
+					  //prevent null plastic from being selected
+					  if (injectControlMenu2.cursor < 2) {
+					  currentPlastic = &plastics[currentItem->cursor + 3];
+					  }
+				  }
+
 				  menuState = ST_INJECT;
 				  injectState = ST_HEAT;
 				  currentItem = &homeDisplay;
@@ -382,9 +465,13 @@ int main(void)
 	  }
 	  //Editing Data
 	  else if (menuState == ST_DATA) {
+		  LCD_SetCursor(&hlcd, 16, currentItem->cursor);
+		  LCD_Print(&hlcd, ">");
 		  //Return to menu item
 		  if (ENC_ReadSwitch(&encoder) == HIGH) {
 			  menuState = ST_ITEM;
+			  LCD_SetCursor(&hlcd, 16, currentItem->cursor);
+			  LCD_Print(&hlcd, " ");
 		  }
 		  //Increment data based on encoder direction
 		  else if (ENC_CountChange(&encoder) == TRUE) {
@@ -399,8 +486,6 @@ int main(void)
 	   * User can cancel procces by pressing encoder button and confirming
 	   */
 	  else if (menuState == ST_INJECT) {
-		  //update display
-		  LCD_MENU_UpdateItemData(currentItem);
 		  uint8_t switchValue = ENC_ReadSwitch(&encoder);
 
 		  //Request to cancel injection
@@ -417,6 +502,7 @@ int main(void)
 				  menuState = ST_MENU;
 				  injectState = ST_STANDBY;
 				  LCD_MENU_PrintList(headList);
+				  heatEnable.value = LOW;
 			  }
 			  //do not cancel
 			  else if (currentItem->cursor == 2) {
@@ -432,6 +518,10 @@ int main(void)
 				  uint8_t direction = ENC_GetDirection(&encoder);
 				  currentItem = LCD_MENU_MoveItemCursor(currentItem, direction);
 			  }
+		  }
+		  else {
+			  //update display
+			  printHomeDisplayData(injectState, currentPlastic);
 		  }
 	  }
 
@@ -455,14 +545,14 @@ int main(void)
 			  prevCountInjectTime = counter;
 
 			  //turn off heat bands
-			  TIM1->CCR2 = 0;
-			  TIM1->CCR1 = 0;
+			  TIM2->CCR2 = 0;
+			  TIM2->CCR1 = 0;
 		  }
 
 		  else {
 			  //turn off heat bands
-			  TIM1->CCR2 = 0;
-			  TIM1->CCR1 = 0;
+			  TIM2->CCR2 = 0;
+			  TIM2->CCR1 = 0;
 		  }
 		  break;
 
@@ -499,19 +589,19 @@ int main(void)
 
 	  }
 
-	 // nozzleTemp.value = getTemperature(&hmax1, thermo1Buffer, &thermo1BufferCount, thermoBufferSize);
-	 // barrelTemp.value = getTemperature(&hmax2, thermo2Buffer, &thermo2BufferCount, thermoBufferSize);
+	  nozzleTemp.value = getTemperature(&hmax1, thermo1Buffer, &thermo1BufferCount, thermoBufferSize);
+	  barrelTemp.value = getTemperature(&hmax2, thermo2Buffer, &thermo2BufferCount, thermoBufferSize);
 
 	  //Heating
 	  if (heatEnable.value == HIGH) {
 		  //turn on nozzle heat bands if below set temp
 		  if (nozzleTemp.value < setNozzleTemp.value) {
-			  TIM1->CCR1 = (uint8_t) heatingSpeed.value;
+			  TIM2->CCR1 = (uint8_t) heatingSpeed.value;
 
 		  }
 		  else {
 			  //turn off heat bands
-			  TIM1->CCR1 = 0;
+			  TIM2->CCR1 = 0;
 			  if (injectState == ST_STANDBY) {
 				  heatEnable.value = LOW;
 			  }
@@ -519,11 +609,11 @@ int main(void)
 
 		  //turn on barrel heat bands if below set temp
 		  if (barrelTemp.value < setBarrelTemp.value) {
-			  TIM1->CCR2 = (uint8_t) heatingSpeed.value;
+			  TIM2->CCR2 = (uint8_t) heatingSpeed.value;
 		  }
 		  else {
 			  //turn off heat bands
-			  TIM1->CCR2 = 0;
+			  TIM2->CCR2 = 0;
 
 			  if (injectState == ST_STANDBY) {
 				  heatEnable.value = LOW;
@@ -535,8 +625,8 @@ int main(void)
 
 	  else {
 		  //turn off heat bands
-		  TIM1->CCR2 = 0;
-		  TIM1->CCR1 = 0;
+		  TIM2->CCR2 = 0;
+		  TIM2->CCR1 = 0;
 	  }
 
 	  //Status LED
@@ -556,7 +646,6 @@ int main(void)
 			  ledEnable.value = LOW;
 		  }
 	  }
-
 
 	  //Update GPIO values;
 	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, ledEnable.value);
@@ -621,7 +710,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL12;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -636,7 +725,7 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
   {
     Error_Handler();
   }
@@ -694,7 +783,7 @@ static void MX_SPI1_Init(void)
   /* SPI1 parameter configuration*/
   hspi1.Instance = SPI1;
   hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES_RXONLY;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
   hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
@@ -726,6 +815,7 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 0 */
 
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
   TIM_OC_InitTypeDef sConfigOC = {0};
 
@@ -735,9 +825,18 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 65535;
+  htim2.Init.Period = 255;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
   if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
   {
     Error_Handler();
@@ -764,6 +863,55 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 2 */
   HAL_TIM_MspPostInit(&htim2);
+
+}
+
+/**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_Encoder_InitTypeDef sConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 0;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 65535;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  sConfig.EncoderMode = TIM_ENCODERMODE_TI1;
+  sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
+  sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
+  sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
+  sConfig.IC1Filter = 0;
+  sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
+  sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
+  sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
+  sConfig.IC2Filter = 0;
+  if (HAL_TIM_Encoder_Init(&htim3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
 
 }
 
@@ -818,7 +966,8 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LED_Pin|SOLENOID_Pin|DOOR_Pin|SPI1_CS1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7|SPI1_CS1_Pin
+                          |ENC_SW_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SPI1_CS2_GPIO_Port, SPI1_CS2_Pin, GPIO_PIN_RESET);
@@ -829,8 +978,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LED_Pin SOLENOID_Pin DOOR_Pin SPI1_CS1_Pin */
-  GPIO_InitStruct.Pin = LED_Pin|SOLENOID_Pin|DOOR_Pin|SPI1_CS1_Pin;
+  /*Configure GPIO pins : PA5 PA6 PA7 SPI1_CS1_Pin
+                           ENC_SW_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7|SPI1_CS1_Pin
+                          |ENC_SW_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -852,7 +1003,81 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+uint16_t getTemperature (MAX31855_HandleTypeDef* thermocouple, uint16_t tempBuffer[], uint8_t * count, uint8_t size)
+{
 
+	//Get measurement
+	tempBuffer[*count] = MAX_GetCelcius(thermocouple);
+	*count = (*count + 1) % size;
+
+	//Calculate total
+	uint32_t total = 0;
+    for (uint8_t i = 0; i < size; i++)
+    {
+	    total += tempBuffer[i];
+    }
+
+    //Calculate and return average
+    uint16_t average = total / size;
+    return average;
+}
+
+void printHomeDisplayData (uint8_t injectState, Plastic_Type* plastic) {
+	char string[21] = {0};
+
+	//print nozzle set temp data
+	LCD_SetCursor(&hlcd, 17, 0);
+	snprintf(string, 21, "%03d", setNozzleTemp.value);
+	LCD_Print(&hlcd, string);
+
+	//print nozzle current temp data
+	LCD_SetCursor(&hlcd, 13, 0);
+	snprintf(string, 21, "%03d", nozzleTemp.value);
+	LCD_Print(&hlcd, string);
+
+	//print barrel set temp data
+	LCD_SetCursor(&hlcd, 17, 1);
+	snprintf(string, 21, "%03d", setBarrelTemp.value);
+	LCD_Print(&hlcd, string);
+
+	//print barrel current temp data
+	LCD_SetCursor(&hlcd, 13, 1);
+	snprintf(string, 21, "%03d", barrelTemp.value);
+	LCD_Print(&hlcd, string);
+
+	if (injectState != ST_STANDBY) {
+		LCD_SetCursor(&hlcd, 0, 2);
+		snprintf(string, 21, "%s", plastic->name);
+		LCD_Print(&hlcd, string);
+
+		if (injectState == ST_HEAT) {
+			LCD_SetCursor(&hlcd, 0, 3);
+			snprintf(string, 21, "heating");
+			LCD_Print(&hlcd, string);
+		}
+		else if (injectState == ST_MELTING) {
+			LCD_SetCursor(&hlcd, 0, 3);
+			snprintf(string, 21, "Timer: %04lu",  (plastic->heatingTime - (counter - prevCountInjectTime)) / 1000 );
+			LCD_Print(&hlcd, string);
+		}
+		else if (injectState == ST_INJECT_PLASTIC) {
+			LCD_SetCursor(&hlcd, 0, 3);
+			snprintf(string, 21, "Injecting           ");
+			LCD_Print(&hlcd, string);
+		}
+
+	}
+	else {
+
+		LCD_SetCursor(&hlcd, 0, 2);
+		snprintf(string, 21, "                 ");
+		LCD_Print(&hlcd, string);
+
+		LCD_SetCursor(&hlcd, 0, 3);
+		snprintf(string, 21, "Standby      ");
+		LCD_Print(&hlcd, string);
+	}
+}
 /* USER CODE END 4 */
 
 /**
