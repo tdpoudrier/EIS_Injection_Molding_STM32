@@ -3,6 +3,8 @@
  *
  *  Created on: Apr 1, 2024
  *      Author: Tevin Poudrier
+ *      Description: Driver for menu interface with 20x4 LCD. List allow selection of 4 menu items. Menu items display text and data. Cursor is used to select.
+ *      	Actions are stored per LCD row on menu items.
  */
 
 #ifndef INC_LCD_MENU_H_
@@ -26,6 +28,12 @@
 #define ITEM_ACTION_TOGGLE 3
 #define ITEM_ACTION_SELECT 4
 
+/**
+ * LCD_MENU_Item struct
+ * used to display 4 rows of strings and data
+ * Can be extended with another list to display more data
+ * cursor represents the selected row and coresposnts to ITEM_ACTIONs stored in rowType
+ */
 typedef struct __LCD_MENU_Item {
 	LCD_HandleTypeDef* hlcd;
 	char * rowText[4];
@@ -40,6 +48,12 @@ typedef struct __LCD_MENU_Item {
 	struct __LCD_MENU_Item* child;
 } LCD_MENU_Item;
 
+/**
+ * LCD_MENU_List struct
+ * Used to display the names of at most 4 menu items
+ * cursor represents selected item
+ * Can be extended with another list to show more items
+ */
 typedef struct __LCD_MENU_List {
 	LCD_HandleTypeDef* hlcd;
 	LCD_MENU_Item* items[4];

@@ -3,6 +3,7 @@
  *
  *  Created on: Mar 3, 2024
  *      Author: Tevin Poudrier
+ *      Description: LCD driver for I2C backpack with MCP23008
  */
 
 #include "LCD_I2C.h"
@@ -56,6 +57,11 @@ HAL_StatusTypeDef LCD_Init (LCD_HandleTypeDef *hlcd, I2C_HandleTypeDef *hi2c, ui
 	return status;
 }
 
+/**
+ * Clears all text on LCD
+ * @param hlcd Pointer to LCD handle
+ * @return HAL_OK on success, otherwise HAL_ERROR
+ */
 HAL_StatusTypeDef LCD_Clear (LCD_HandleTypeDef *hlcd) {
 	return LCD_WriteCommand(hlcd, 0x01);
 }
@@ -74,6 +80,7 @@ HAL_StatusTypeDef LCD_SetCursor (LCD_HandleTypeDef *hlcd, uint8_t col, uint8_t r
 
 	uint8_t cursorPos = 0;
 
+	//Add row address to column
 	switch (row) {
 	case 0:
 		cursorPos = col + LCD_ROW_0;
@@ -91,9 +98,16 @@ HAL_StatusTypeDef LCD_SetCursor (LCD_HandleTypeDef *hlcd, uint8_t col, uint8_t r
 		return HAL_ERROR;
 	}
 
+	//Set cursor to address in cursorPos
 	return LCD_WriteCommand(hlcd, LCD_SET_DDRAM | cursorPos);
 }
 
+/**
+ * Print each character in string array to LCD one at a time
+ * @param hlcd Pointer to LCD handle
+ * @param string null terminated character array
+ * @return HAL_OK on success, otherwise HAL_ERROR
+ */
 HAL_StatusTypeDef LCD_Print (LCD_HandleTypeDef *hlcd, char *string) {
 	HAL_StatusTypeDef status = HAL_OK;
 	for (int i = 0; i < strlen(string); i++) {
@@ -180,7 +194,7 @@ HAL_StatusTypeDef LCD_SendData (LCD_HandleTypeDef *hlcd, uint8_t data) {
  * @param hlcd Pointer to handle for LCD
  * @param mcp23008Address Register address for MCP23008
  * @param data Data to be sent to MCP23008 over I2C
- * @return
+ * @return HAL_OK on success, stops and returns HAL_ERROR otherwise
  */
 HAL_StatusTypeDef MCP23008_SendDataI2C (LCD_HandleTypeDef *hlcd, uint8_t mcp23008Address, uint8_t data) {
 	uint8_t dataBuffer[] = {mcp23008Address, data};

@@ -3,6 +3,7 @@
  *
  *  Created on: Apr 6, 2024
  *      Author: Tevin Poudrier
+ *      Description: data display element for LCD menu interface. Allows data to be printed and modified while displayed on LCD
  */
 
 #ifndef INC_LCD_MENU_DATA_H_
@@ -12,6 +13,11 @@
 
 #define LCD_DATA_COL 17
 
+/**
+ * LCD_MENU_Data struct
+ * stores the lcd handle to print data at defined position
+ * rowPos is configurable but colPos is initialized to 17
+ */
 typedef struct __LCD_MENU_Data {
 	LCD_HandleTypeDef* hlcd;
 	uint16_t value;

@@ -3,6 +3,7 @@
   ******************************************************************************
   * @file           : main.c
   * @brief          : Main program body
+  * @author			: Tevin Poudrier
   ******************************************************************************
   * @attention
   *
@@ -89,7 +90,11 @@ void printHomeDisplayData (uint8_t injectState, Plastic_Type* plastic);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+//Counter increments every ms by interupts
 volatile uint32_t counter = 0;
+
+//Save counter time to create non-blocking delays
 uint32_t prevCountPrintDebug;
 uint32_t prevCountInjectTime;
 uint32_t prevCountLED;
@@ -144,10 +149,10 @@ int main(void)
   /* USER CODE BEGIN 1 */
 	uint8_t MSG[100] = {'\0'};
 
+	//Ring/Round buffer for temperature data averaging
 	uint8_t thermoBufferSize = 10;
 	uint16_t thermo1Buffer[10] = {0};
 	uint8_t thermo1BufferCount = 0;
-
 	uint16_t thermo2Buffer[10] = {0};
 	uint8_t thermo2BufferCount = 0;
 
@@ -283,8 +288,8 @@ int main(void)
   LCD_Init(&hlcd, &hi2c1, LCD_ADDRESS);
   MAX_Init(&hmax1, &hspi1, GPIO_PIN_8, GPIOA);
   MAX_Init(&hmax2, &hspi1, GPIO_PIN_10, GPIOB);
-  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1); //Nozzle heater
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2); //Barrel heater
 
   //Initalize Menu Lists
   LCD_MENU_ListInit(&hlcd, &mainMenu);
@@ -292,14 +297,14 @@ int main(void)
   LCD_MENU_ExtendList(&mainMenu, &mainMenu2);
 
   //Initialize Data Elements
-  LCD_MENU_DataInit(&setNozzleTemp, &hlcd); // set temp
+  LCD_MENU_DataInit(&setNozzleTemp, &hlcd);
   LCD_MENU_DataInit(&setBarrelTemp, &hlcd);
-  LCD_MENU_DataInit(&nozzleTemp, &hlcd); // current temp 1
-  LCD_MENU_DataInit(&barrelTemp, &hlcd); // current temp 2
-  LCD_MENU_DataInit(&heatEnable, &hlcd); // heating on/off
-  LCD_MENU_DataInit(&pistonEnable, &hlcd); // piston
-  LCD_MENU_DataInit(&doorEnable, &hlcd); // h door
-  LCD_MENU_DataInit(&ledEnable, &hlcd); // led
+  LCD_MENU_DataInit(&nozzleTemp, &hlcd);
+  LCD_MENU_DataInit(&barrelTemp, &hlcd);
+  LCD_MENU_DataInit(&heatEnable, &hlcd);
+  LCD_MENU_DataInit(&pistonEnable, &hlcd);
+  LCD_MENU_DataInit(&doorEnable, &hlcd);
+  LCD_MENU_DataInit(&ledEnable, &hlcd);
   LCD_MENU_DataInit(&injectionEnable, &hlcd);
   LCD_MENU_DataInit(&customSetBarrelTemp, &hlcd);
   LCD_MENU_DataInit(&customSetNozzleTemp, &hlcd);
@@ -361,25 +366,26 @@ int main(void)
   sprintf( (char*) MSG, "EIS Injection Molding\n\r");
   HAL_UART_Transmit(&huart2, MSG, strlen( (char*) MSG), 100);
 
+  //Initialize state machines
   uint8_t menuState = ST_MENU;
   uint8_t injectState = ST_STANDBY;
   uint8_t cancelRequest = LOW;
 
+  //Initialize current object pointers
   LCD_MENU_List* headList = &mainMenu;
   LCD_MENU_List* currentList = headList;
   LCD_MENU_Item* currentItem = &homeDisplay;
   Plastic_Type* currentPlastic = plastic_HDPE;
 
-  LCD_MENU_PrintList (headList);
-
   //set default temperatures
   setNozzleTemp.value = 220; //set temp to 5
   setBarrelTemp.value = 210;
   heatingSpeed.value = 210; // heat bands duty cycle 0-255
-
   customSetBarrelTemp.value = 200;
   customSetNozzleTemp.value = 200;
   customMeltTime.value = 20;
+
+  LCD_MENU_PrintList (headList);
 
   /* USER CODE END 2 */
 
@@ -398,11 +404,13 @@ int main(void)
 
 	  //Navigate main menu
 	  if (menuState == ST_MENU) {
+		  //Select menu item
 		  if (ENC_ReadSwitch(&encoder) == HIGH) {
 			  menuState = ST_ITEM;
 			  currentItem = currentList->items[currentList->cursor];
 			  LCD_MENU_PrintItem(currentItem);
 		  }
+		  //Move cursor
 		  else if (ENC_CountChange(&encoder) == TRUE) {
 			  uint8_t direction = ENC_GetDirection(&encoder);
 			  currentList = LCD_MENU_MoveListCursor(currentList, direction);
@@ -410,13 +418,16 @@ int main(void)
 	  }
 	  //Navigate menu item
 	  else if (menuState == ST_ITEM) {
+		  //print home display
 		  if (currentItem == &homeDisplay) {
 			  printHomeDisplayData(injectState, currentPlastic);
 		  }
+		  //update data on display menu item
 		  else if (currentItem->type == ITEM_TYPE_DISPLAY) {
 			  LCD_MENU_UpdateItemData(currentItem);
 		  }
 
+		  //Select cursor location
 		  if (ENC_ReadSwitch(&encoder) == HIGH) {
 			  //Return to main menu
 			  if (currentItem->type == ITEM_TYPE_DISPLAY) {
@@ -450,8 +461,11 @@ int main(void)
 					  }
 				  }
 
+				  //Start injection process
 				  menuState = ST_INJECT;
 				  injectState = ST_HEAT;
+
+				  //Print home display
 				  currentItem = &homeDisplay;
 				  LCD_MENU_PrintItem(&homeDisplay);
 			  }
@@ -467,7 +481,8 @@ int main(void)
 	  else if (menuState == ST_DATA) {
 		  LCD_SetCursor(&hlcd, 16, currentItem->cursor);
 		  LCD_Print(&hlcd, ">");
-		  //Return to menu item
+
+		  //Stop editing data
 		  if (ENC_ReadSwitch(&encoder) == HIGH) {
 			  menuState = ST_ITEM;
 			  LCD_SetCursor(&hlcd, 16, currentItem->cursor);
@@ -594,13 +609,14 @@ int main(void)
 
 	  //Heating
 	  if (heatEnable.value == HIGH) {
+
 		  //turn on nozzle heat bands if below set temp
 		  if (nozzleTemp.value < setNozzleTemp.value) {
 			  TIM2->CCR1 = (uint8_t) heatingSpeed.value;
 
 		  }
+		  //turn off nozzle heater
 		  else {
-			  //turn off heat bands
 			  TIM2->CCR1 = 0;
 			  if (injectState == ST_STANDBY) {
 				  heatEnable.value = LOW;
@@ -611,8 +627,8 @@ int main(void)
 		  if (barrelTemp.value < setBarrelTemp.value) {
 			  TIM2->CCR2 = (uint8_t) heatingSpeed.value;
 		  }
+		  //turn off barrel heater
 		  else {
-			  //turn off heat bands
 			  TIM2->CCR2 = 0;
 
 			  if (injectState == ST_STANDBY) {
@@ -623,22 +639,23 @@ int main(void)
 	  }
 
 
+	  //turn off heat bands
 	  else {
-		  //turn off heat bands
 		  TIM2->CCR2 = 0;
 		  TIM2->CCR1 = 0;
 	  }
 
 	  //Status LED
 	  if (injectState != ST_STANDBY) {
+
 		  //blink LED during injection process
 		  if (counter - prevCountLED > 500) {
-			  //toggle LED
-			  ledEnable.value = !ledEnable.value & 0x1;
+			  ledEnable.value = !ledEnable.value & 0x1; //toggle LED
 			  prevCountLED = counter;
 		  }
 	  }
 	  else {
+		  //LED on if machine is hot
 		  if (nozzleTemp.value > 40 || barrelTemp.value > 40) {
 			  ledEnable.value = HIGH;
 		  }

@@ -1,12 +1,20 @@
 /*
- * MAX3166.c
+ * MAX31855.c
  *
  *  Created on: Mar 8, 2024
- *      Author: User1
+ *      Author: Tevin Poudrier
+ *      Description: Driver for MAX31855 thermocouple amplifier
  */
 #include "main.h"
 #include "MAX31855.h"
 
+/**
+ *  Initialize MAX31855 by storing SPI communication and writing CS high
+ *  @param hmax Pointer to max handle
+ *  @param hspi Pointer to spi handle
+ *  @param csPin The GPIO pin defined as GPIO_PIN_x
+ *  @param csPort The GPIO port defined as GPIOx
+ */
 void MAX_Init (MAX31855_HandleTypeDef *hmax,SPI_HandleTypeDef *hspi, uint16_t csPin, GPIO_TypeDef *csPort) {
 
 	hmax->csPin = csPin;
@@ -18,6 +26,10 @@ void MAX_Init (MAX31855_HandleTypeDef *hmax,SPI_HandleTypeDef *hspi, uint16_t cs
 
 }
 
+/**
+ * Get celcius temperature data from the MAX31855
+ * @param maxPtr Pointer to MAX31855 handle
+ */
 int16_t MAX_GetCelcius (MAX31855_HandleTypeDef * maxPtr) {
 
 	uint8_t spi_buf[4] = {0};
@@ -45,8 +57,6 @@ int16_t MAX_GetCelcius (MAX31855_HandleTypeDef * maxPtr) {
 
 	return (int16_t) (celcius);
 }
-
-//Read 32 bits from MAX3166
 
 
 

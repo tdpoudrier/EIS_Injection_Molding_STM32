@@ -3,6 +3,7 @@
  *
  *  Created on: Apr 9, 2024
  *      Author: Tevin Poudrier
+ *      Description: Driver for encoder sensor with STM32 timer set to encoder mode
  */
 
 #ifndef INC_ENCODER_H_
@@ -12,6 +13,11 @@
 
 #define ENC_THRESHOLD 3
 
+/**
+ * ENC_Handle struct
+ * Stores the timer handles that is set to encoder mode and the GPIO for the switch
+ * Uses prevCount and prevState for debouncing
+ */
 typedef struct __encoder_Handle {
 	TIM_TypeDef* htim;
 	uint16_t pin;

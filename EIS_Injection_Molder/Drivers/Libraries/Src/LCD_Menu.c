@@ -3,15 +3,16 @@
  *
  *  Created on: Apr 1, 2024
  *      Author: Tevin Poudrier
+ *      Description: Menu driver for 20x4 character LCD
  */
 
 #include "LCD_Menu.h"
 #include <string.h>
 
-//TODO convert data times to embedded typedefs like uint8_t
-
 /**
  * Initialize menu list
+ * @param hlcd Pointer to handle for LCD
+ * @param list Pointer to list object being initialized
  */
 void LCD_MENU_ListInit (LCD_HandleTypeDef* hlcd, LCD_MENU_List* list) {
 	list->hlcd = hlcd;
@@ -26,6 +27,11 @@ void LCD_MENU_ListInit (LCD_HandleTypeDef* hlcd, LCD_MENU_List* list) {
 	list->child = NULL;
 }
 
+/**
+ * Attached an extension list to the parent list. Allows for lists with more than 4 rows or multiple LCD screens
+ * @param parent Pointer to parent list
+ * @param extension Pointer to extension list
+ */
 void LCD_MENU_ExtendList (LCD_MENU_List* parent, LCD_MENU_List* extension) {
 	parent->child = extension;
 	extension->parent = parent;
@@ -33,11 +39,14 @@ void LCD_MENU_ExtendList (LCD_MENU_List* parent, LCD_MENU_List* extension) {
 
 /**
  * Increment the cursor on the list. if cursor is moved past list, print new list
- * returns pointer to current printed list
+ * @param list List to increment cursor of
+ * @param direction The direction the cursor is incremented, 1 increases cursor and anything else decreases cursor
+ * @returns pointer to current printed list
  */
 LCD_MENU_List* LCD_MENU_MoveListCursor (LCD_MENU_List* list, uint8_t direction) {
 	uint8_t prevCursor = list->cursor;
 
+	//Increment cursor
 	if (direction == 1) {
 		list->cursor++;
 	}
@@ -85,8 +94,7 @@ LCD_MENU_List* LCD_MENU_MoveListCursor (LCD_MENU_List* list, uint8_t direction) 
 /**
  * Initialize menu item. Sets the name and text of menu item.
  * @param name is a string
- * @param text is an array of strings
- * text must have 4 strings
+ * @param text is an array of 4 strings
  */
 void LCD_MENU_ItemInit (LCD_HandleTypeDef* hlcd, LCD_MENU_Item* item, char name[], char * text[], uint8_t type) {
 	item->itemName = name;
@@ -137,8 +145,9 @@ void LCD_MENU_AddItemToList (LCD_MENU_List* listHead, LCD_MENU_Item* item) {
 }
 
 /**
- * Increment the cursor on the list. if cursor is moved past list, print new list
- * returns pointer to current printed list
+ * Attachs an extension item to the parent item. Allows for items with more than 4 rows or multiple LCD screens
+ * @param parent Pointer to parent item
+ * @param extension Pointer to extension item
  */
 void LCD_MENU_ExtendItem(LCD_MENU_Item* parent, LCD_MENU_Item* extenstion) {
 	parent->child = extenstion;
@@ -146,8 +155,10 @@ void LCD_MENU_ExtendItem(LCD_MENU_Item* parent, LCD_MENU_Item* extenstion) {
 }
 
 /**
- * Increment the cursor on the list. if cursor is moved past list, print new list
- * returns pointer to current printed list
+ * Increment the cursor on the item. if cursor is moved past item, print new item
+ * @param item Item to increment cursor of
+ * @param direction The direction the cursor is incremented, 1 increases cursor and anything else decreases cursor
+ * @returns pointer to current printed item
  */
 LCD_MENU_Item* LCD_MENU_MoveItemCursor (LCD_MENU_Item* item, uint8_t direction) {
 	uint8_t prevCursor = item->cursor;
@@ -199,7 +210,10 @@ LCD_MENU_Item* LCD_MENU_MoveItemCursor (LCD_MENU_Item* item, uint8_t direction) 
 }
 
 /**
- * Define the action of a menu item row
+ * Define the action of a menu item row, actions are defined in LCD_Menu.h
+ * @param item Item to add action to
+ * @param index Row index to add action to, ranges from 0-3
+ * @param action Action to set item row to
  */
 void LCD_MENU_ItemSetAction (LCD_MENU_Item* item, uint8_t index, uint8_t action) {
 	if (action > 4 || index > 3) {
@@ -211,6 +225,7 @@ void LCD_MENU_ItemSetAction (LCD_MENU_Item* item, uint8_t index, uint8_t action)
 
 /**
  * Print the list and its cursor to the LCD
+ * @param list List to print
  */
 void LCD_MENU_PrintList (LCD_MENU_List* list) {
 	LCD_Clear(list->hlcd);
@@ -229,7 +244,8 @@ void LCD_MENU_PrintList (LCD_MENU_List* list) {
 
 
 /**
- * Print a menu item to the lcd based on the cursor location
+ * Print a menu item to the lcd
+ * @param item Item to print
  */
 void LCD_MENU_PrintItem (LCD_MENU_Item* item) {
 
@@ -248,13 +264,21 @@ void LCD_MENU_PrintItem (LCD_MENU_Item* item) {
 }
 
 /**
- * Add a data element to a menu item
+ * Add a data element to a menu item, allows for data to be displayed and modified from LCD
+ * @param item Item to add data element to
+ * @param dataItem the data being added
+ * @param row The LCD row to add data to, values range from 0 to 3
+ * @oaram ITEM_ACTION_XX Action to add to data element
  */
 void LCD_MENU_ItemAddData(LCD_MENU_Item* item, LCD_MENU_Data* dataItem, int8_t row, uint8_t ITEM_ACTION_XX) {
 	item->dataElement[row] = dataItem;
 	item->rowType[row] = ITEM_ACTION_XX;
 }
 
+/**
+ * Update data shown on LCD
+ * @param item Currently displayed menu item
+ */
 void LCD_MENU_UpdateItemData(LCD_MENU_Item* item) {
 	for(uint8_t i = 0; i < 4; i++) {
 		if (item->dataElement[i] != NULL) {
@@ -269,6 +293,12 @@ void LCD_MENU_UpdateItemData(LCD_MENU_Item* item) {
 	}
 }
 
+/**
+ * Change the string stored in menu item
+ * @param item Item to change row string of
+ * @param row Row to change string, values must be in the range 0-3
+ * @param string null terminated character array
+ */
 void LCD_MENU_ItemSetString (LCD_MENU_Item* item, uint8_t row, char * string) {
 	item->rowText[row] = string;
 }

@@ -3,6 +3,7 @@
  *
  *  Created on: Mar 3, 2024
  *      Author: Tevin Poudrier
+ *      Description: LCD driver for I2C backpack with MCP23008
  */
 
 #ifndef INC_LCD_I2C_H_
@@ -26,6 +27,11 @@
 
 #define LCD_MAX_ROW_LENGTH 21
 
+/**
+ * LCD_HandleTypeDef struct
+ * contains I2C address of the LCD
+ * Uses I2C_HandleTypeDef to communicate over I2C
+ */
 typedef struct __LCD_HandleTypeDef {
 	uint16_t address;
 	I2C_HandleTypeDef *hi2c;

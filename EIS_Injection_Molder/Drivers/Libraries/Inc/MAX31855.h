@@ -1,8 +1,9 @@
 /*
- * MAX3166.h
+ * MAX31855.h
  *
  *  Created on: Mar 8, 2024
- *      Author: User1
+ *      Author: Tevin Poudrier
+ *      Description: Driver for MAX31855 thermocouple amplifier
  */
 
 #ifndef INC_MAX31855_H_
@@ -10,6 +11,10 @@
 
 #define MAX31855_THERMOCOUPLE_MASK 0xFFFC0000
 
+/**
+ * MAX31855_HandleTypeDef struct
+ * Stores the SPI handle and the CS GPIO data to communicate over SPI
+ */
 typedef struct __MAX31855_struct {
 	SPI_HandleTypeDef *hspi;
 	uint16_t csPin;
